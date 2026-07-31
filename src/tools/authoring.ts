@@ -43,7 +43,7 @@ export function registerAuthoringTools(server: McpServer): void {
       description:
         "Creates a new blog post in ONE language as a draft. It never publishes — status is " +
         "always 'draft', so the post is invisible on the public site until publish_post is " +
-        "called. Add other languages with add_translation or auto_translate_post. The slug " +
+        "called. Add other languages with add_translation or auto_translate. The slug " +
         "is the bare leaf (no /blog/ prefix); the site composes the routable path. Requires " +
         "login and that the brand is write-enabled.",
       inputSchema: {
@@ -101,7 +101,7 @@ export function registerAuthoringTools(server: McpServer): void {
           status: created.status,
           ...(slugCorrected ? { slug_corrected_to: cleanSlug } : {}),
           next_steps: [
-            "Add other languages: add_translation or auto_translate_post",
+            "Add other languages: add_translation or auto_translate",
             `Check quality: seo_audit_post({ project: "${project}", post_id: ${created.id} })`,
             `Go live once the audit passes: publish_post`,
           ],
@@ -115,7 +115,7 @@ export function registerAuthoringTools(server: McpServer): void {
       title: "Add a language to a post",
       description:
         "Adds one more language translation to an existing post. Use for hand-written " +
-        "translations; for machine translation use auto_translate_post instead. Requires " +
+        "translations; for machine translation use auto_translate instead. Requires " +
         "login and a write-enabled brand.",
       inputSchema: {
         project: projectParam,

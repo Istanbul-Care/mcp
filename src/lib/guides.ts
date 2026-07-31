@@ -28,8 +28,9 @@ slug or an internal URL by hand — call generate_slug and resolve_internal_link
 6. Audit + fix: seo_audit_post until publish_ready:true; audit_post for slug +
    links; fix a slug with update_post_translation, links with fix_post_links
    (dry_run:true first, then dry_run:false).
-7. Translate (optional): auto_translate_post -> poll auto_translate_status ->
-   review; auto_translate_rollback undoes a run.
+7. Translate (optional): auto_translate -> poll auto_translate_status ->
+   review; auto_translate_rollback undoes a run. To fill a language across the
+   whole brand at once, use translate_everything instead.
 8. Publish: publish_post (re-runs the SEO gate; refuses if a blocking check
    fails). Pass scheduled_at to schedule. unpublish_post reverts to draft.
 

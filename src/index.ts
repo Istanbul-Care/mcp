@@ -14,6 +14,7 @@ import { registerContentQualityTools } from "./tools/content-quality.js";
 import { registerServiceTools } from "./tools/services.js";
 import { registerBulkAuditTools } from "./tools/bulk-audit.js";
 import { registerGuideTools } from "./tools/guides.js";
+import { registerTranslatePrompt } from "./prompts/translate-brand.js";
 
 const server = new McpServer(
   { name: "istanbul-care-content", version: "0.1.0" },
@@ -42,6 +43,7 @@ registerContentQualityTools(server);
 registerServiceTools(server);
 registerBulkAuditTools(server);
 registerGuideTools(server);
+registerTranslatePrompt(server);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();

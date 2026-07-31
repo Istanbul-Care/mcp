@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PROJECT_IDS, isProjectId, type ProjectId } from "../config/projects.js";
 import { get } from "../api/client.js";
-import type { Envelope, LanguageListData } from "../api/types.js";
+import type { Envelope, LanguageListData, LanguageListItem } from "../api/types.js";
 
 export const projectParam = z
   .enum(PROJECT_IDS as [ProjectId, ...ProjectId[]])
@@ -53,12 +53,16 @@ export async function guard(fn: () => Promise<ToolResult>): Promise<ToolResult> 
   }
 }
 
-const languageCache = new Map<ProjectId, { codes: string[]; at: number }>();
+const languageCache = new Map<
+  ProjectId,
+  { languages: LanguageListItem[]; at: number }
+>();
 const LANGUAGE_TTL_MS = 10 * 60_000;
 
-export async function getActiveLanguageCodes(project: ProjectId): Promise<string[]> {
+/** Active languages for a brand, with the numeric ids translations key off. */
+export async function getActiveLanguages(project: ProjectId): Promise<LanguageListItem[]> {
   const cached = languageCache.get(project);
-  if (cached && Date.now() - cached.at < LANGUAGE_TTL_MS) return cached.codes;
+  if (cached && Date.now() - cached.at < LANGUAGE_TTL_MS) return cached.languages;
 
   const response = await get<Envelope<LanguageListData>>(
     project,
@@ -66,7 +70,39 @@ export async function getActiveLanguageCodes(project: ProjectId): Promise<string
     { limit: 100, is_active: true },
     false,
   );
-  const codes = response.data.languages.map((language) => language.code.toLowerCase());
-  languageCache.set(project, { codes, at: Date.now() });
-  return codes;
+  const languages = response.data.languages;
+  languageCache.set(project, { languages, at: Date.now() });
+  return languages;
+}
+
+export async function getActiveLanguageCodes(project: ProjectId): Promise<string[]> {
+  const languages = await getActiveLanguages(project);
+  return languages.map((language) => language.code.toLowerCase());
+}
+
+/** Resolve language codes to their ids, rejecting anything the brand does not have. */
+export async function resolveLanguageIds(
+  project: ProjectId,
+  codes: string[],
+): Promise<Map<string, number>> {
+  const languages = await getActiveLanguages(project);
+  const byCode = new Map(
+    languages.map((language) => [language.code.toLowerCase(), language.id]),
+  );
+  const resolved = new Map<string, number>();
+  const unknown: string[] = [];
+
+  for (const code of codes) {
+    const id = byCode.get(code.toLowerCase());
+    if (id === undefined) unknown.push(code);
+    else resolved.set(code.toLowerCase(), id);
+  }
+
+  if (unknown.length > 0) {
+    throw new Error(
+      `Not an active language on '${project}': ${unknown.join(", ")}. ` +
+        `Active: ${[...byCode.keys()].join(", ")}.`,
+    );
+  }
+  return resolved;
 }

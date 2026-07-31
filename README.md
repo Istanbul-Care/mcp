@@ -9,9 +9,9 @@ Covers all 11 brands in `src/config/projects.ts`, including IC, AHC
 
 ## Status
 
-This iteration ships **auth + the read side**. Write tools (`create_post_draft`,
-`update_post`, `add_translation`, `publish_post`, `auto_translate_post`) are next;
-the plumbing they need is already in place.
+Auth, the read side, authoring, SEO and translation are all in. Writes stay
+behind the `ICMCP_WRITE_PROJECTS` gate, so a brand nobody opted in cannot be
+touched.
 
 ## Install
 
@@ -72,13 +72,74 @@ Each brand is logged into separately — a token for IC does not work against AH
 | `seo_audit_post` | ✓ | The backend's SEO checks, split into blocking vs advisory |
 | `create_post_draft` / `update_post_translation` / `add_translation` / `set_post_metadata` | ✓* | Author a post (draft-first) |
 | `publish_post` / `unpublish_post` | ✓* | Go live (SEO-gated) / return to draft |
-| `auto_translate_post` / `_status` / `_rollback` | ✓* | Machine translation |
+| `auto_translate` / `_status` / `_rollback` | ✓* | Machine-translate one post, service or page |
+| `translation_coverage` | ✓ | What is untranslated, across all 30 surfaces |
+| `translate_everything` / `_status` | ✓* | Brand-wide sweep, throttled |
+| `translation_worklist` / `save_translations` | ✓* | The surfaces no endpoint translates |
 | `create_post_category` / `add_category_translation` | ✓* | Create/translate a category |
 | `create_tag` / `add_tag_translation` | ✓* | Create/translate a tag |
 | `list_post_faqs` / `add_post_faq` / `add_faq_translation` / `delete_faq` | ✓* | A post's FAQ block + FAQPage schema |
 | `list_seo_schemas` / `set_post_seo_schema` | ✓* | Structured data (JSON-LD) |
 
 `✓` needs login. `✓*` also needs the brand in `ICMCP_WRITE_PROJECTS` (write gate).
+
+## Translating a brand into a language
+
+The client-facing entry point is the `translate_brand` prompt — in Claude Code
+that is a slash command:
+
+```
+/ic-content:translate_brand  project=istanbul-care  language=ar
+```
+
+Nothing about it is Arabic-specific; `language=el` next month is the same call.
+
+Underneath it, a brand's content splits in two:
+
+- **Posts, services and pages** have a backend endpoint that runs the
+  translation server-side (DeepSeek), re-localises internal links, caps meta at
+  SEO sizes and emits ASCII slugs. `translate_everything` queues those.
+- **The other 27 surfaces** — taxonomy, FAQs, cards, heroes, sliders, packages,
+  price comparisons, processes, promotional landings, before/afters, forms,
+  menus, footers, global settings — have translation CRUD and nothing else. No
+  endpoint translates them. So the agent holding the session is the translator:
+  `translation_worklist` hands it the source strings, `save_translations` writes
+  its rendering back.
+
+`save_translations` deliberately does not accept everything. Slugs are derived
+from the translated title the way the backend derives them, internal URLs are
+re-pointed at the target language through the slug lookup, and non-prose columns
+(prices, currencies, icons, image ids, phone numbers, social handles) are copied
+off the source row. An agent that "translates" a phone number is a bug, so those
+fields are never handed to it.
+
+### Why the sweep is throttled
+
+`POST /auto-translate` hands the work to FastAPI's in-process `BackgroundTasks`.
+There is no Celery, no Redis, no queue — and no concurrency cap, with a 180s
+DeepSeek timeout per call. A hundred simultaneous jobs would sit on the API
+worker for the rest of the afternoon. So `translate_everything` keeps a small
+number in flight (default 2) and each `translate_everything_status` poll starts
+the next ones. **The sweep does not advance on its own** — stop polling and it
+stalls with work still queued. Batch state lives in
+`~/.ic-content-mcp/translate-batches.json` (override with `ICMCP_STATE_DIR`) so a
+poll still works after the server restarts.
+
+### Keeping the registry honest
+
+`src/lib/translatable.ts` lists every place content carries a per-language row:
+how to enumerate it, where to write it, and what each field is (prose, HTML,
+slug, URL, or copy-verbatim). That registry is what makes "everywhere" mean
+everywhere — and what goes stale the moment the backend grows a column.
+
+```bash
+npm run build && npm run check:translatable
+```
+
+diffs it against the live API's OpenAPI spec (`../ICFrontend/api.yml` by default;
+pass another path as an argument) and fails on drift. Surfaces left out on
+purpose are recorded in `UNCOVERED` with the reason, so "not covered" is a
+decision rather than an oversight. Today that is one entry: media alt text.
 
 ## Not covered (by design, this iteration)
 

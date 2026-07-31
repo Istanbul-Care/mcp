@@ -12,7 +12,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "check:translatable": "node scripts/check-translatable.mjs"
   },
   "engines": {
     "node": ">=20"

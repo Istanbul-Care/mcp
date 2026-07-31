@@ -23,6 +23,9 @@ function show(label, result) {
 const { tools } = await client.listTools();
 console.log(`Tools (${tools.length}): ${tools.map((tool) => tool.name).join(", ")}`);
 
+const { prompts } = await client.listPrompts();
+console.log(`Prompts (${prompts.length}): ${prompts.map((prompt) => prompt.name).join(", ")}`);
+
 show("list_projects", await client.callTool({ name: "list_projects", arguments: {} }));
 
 show(
