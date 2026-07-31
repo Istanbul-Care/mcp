@@ -61,16 +61,24 @@ export type TranslationWrite =
       mode: "endpoint";
       /** `{id}` is substituted with the row id. */
       create: string;
-      /** `{id}` and `{language}` are substituted. */
-      update: string;
+      /**
+       * `{id}` and `{language}` are substituted. Omit when the entity has no
+       * per-language PUT and its POST upserts instead (media alt works this way).
+       */
+      update?: string;
       /** Which identifier the row is keyed by in the payload. */
       key: "language_id" | "language_code";
     }
   | {
-      /** Before/after-AI steps carry their translations inside the row itself. */
+      /**
+       * Some entities have no /translations endpoint at all — their translations
+       * live inside the row and are written by PUTting the row with the FULL set
+       * of translations (languages left out are deleted). Before/after-AI steps
+       * and links work this way.
+       */
       mode: "embedded";
       put: string;
-      key: "language_code";
+      key: "language_code" | "language_id";
     };
 
 export interface TranslatableSurface {
@@ -520,6 +528,33 @@ export const SURFACES: TranslatableSurface[] = [
     titleField: "title",
     fields: [t("title"), t("description")],
   },
+  {
+    // The site-wide CTA buttons (WhatsApp / consultation). Only the button's
+    // text and its link are per-language; the icon and size are shared. Like the
+    // AI steps, links have no /translations endpoint — the whole set is PUT back
+    // with the row, so save has to re-send the other languages or they are lost.
+    type: "link",
+    label: "CTA link button",
+    llm: null,
+    source: { path: "/admin/links", key: "links" },
+    write: { mode: "embedded", put: "/admin/links/{id}", key: "language_id" },
+    titleField: "button_text",
+    fields: [t("button_text"), url("button_url")],
+  },
+  {
+    // Image alt text. `GET /admin/media` returns the rows as the envelope's
+    // `data` array directly (pagination sits beside it, not inside), and there
+    // is no per-language PUT — the POST upserts by language_code. The library is
+    // large, so a media-only sweep is best run on its own rather than folded
+    // into a content pass.
+    type: "media",
+    label: "Image alt text",
+    llm: null,
+    source: { path: "/admin/media", key: "data" },
+    write: { mode: "endpoint", create: "/admin/media/{id}/translations", key: "language_code" },
+    titleField: "alt",
+    fields: [t("alt", 255)],
+  },
 ];
 
 /**
@@ -528,13 +563,7 @@ export const SURFACES: TranslatableSurface[] = [
  * `scripts/check-translatable.mjs` reads this, so "not covered" is a recorded
  * decision rather than something that quietly fell off the list.
  */
-export const UNCOVERED: Record<string, string> = {
-  "/admin/media/{}/translations":
-    "Media alt text. The backend's own post translator already writes alts for " +
-    "every image it finds in translated content, `GET /admin/media` has no typed " +
-    "list schema to enumerate safely, and a brand's media library is far larger " +
-    "than its content. Worth revisiting if alt coverage turns out to lag.",
-};
+export const UNCOVERED: Record<string, string> = {};
 
 export const SURFACE_TYPES = SURFACES.map((surface) => surface.type) as [
   string,

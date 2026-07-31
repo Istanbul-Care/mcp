@@ -62,8 +62,35 @@ for (const [path, item] of Object.entries(spec.paths)) {
   specCreatePaths.set(normalize(path), { path, fields: requestFields(spec, item.post) });
 }
 
+/**
+ * Embedded surfaces: an entity that carries a `translations` array in its
+ * create/update body but has NO /translations endpoint. `link` and
+ * `before_after_ai_step` are the two today — this is exactly the shape that
+ * slips past a /translations-only scan, so catch it explicitly.
+ */
+function bodyHasTranslations(operation) {
+  const schema = deref(
+    spec,
+    operation?.requestBody?.content?.["application/json"]?.schema,
+  );
+  return Boolean(schema?.properties?.translations);
+}
+const specEmbeddedUpdates = new Map();
+for (const [path, item] of Object.entries(spec.paths)) {
+  // The row-level PUT (e.g. /admin/links/{id}) that owns the translations.
+  if (!item.put || !/\/\{[a-z_]+\}$/.test(path)) continue;
+  if (!bodyHasTranslations(item.put)) continue;
+  // Skip if a /translations endpoint also exists — then it's a normal surface.
+  const collection = path.replace(/\/\{[a-z_]+\}$/, "");
+  const hasEndpoint = Object.keys(spec.paths).some((p) =>
+    normalize(p) === normalize(`${collection}/{id}/translations`),
+  );
+  if (!hasEndpoint) specEmbeddedUpdates.set(normalize(path), path);
+}
+
 const problems = [];
 const covered = new Set();
+const coveredEmbedded = new Set();
 
 for (const surface of SURFACES) {
   if (surface.write.mode === "embedded") {
@@ -75,6 +102,7 @@ for (const surface of SURFACES) {
     if (!exists) {
       problems.push(`${surface.type}: no PUT ${surface.write.put} in the spec`);
     }
+    coveredEmbedded.add(putPath);
     continue;
   }
 
@@ -108,6 +136,15 @@ for (const [key, found] of specCreatePaths) {
     continue;
   }
   problems.push(`no surface registered for ${found.path}`);
+}
+
+for (const [key, path] of specEmbeddedUpdates) {
+  if (coveredEmbedded.has(key)) continue;
+  if (UNCOVERED[key]) {
+    skipped.push(`${path} (embedded) — ${UNCOVERED[key]}`);
+    continue;
+  }
+  problems.push(`embedded-translation entity not registered: PUT ${path} carries a translations array with no /translations endpoint`);
 }
 
 const surfaceCount = SURFACES.length;

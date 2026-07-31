@@ -220,11 +220,21 @@ async function composePayload(options: ComposeOptions): Promise<Record<string, u
         break;
       }
       case "slug": {
-        const basis =
-          typeof given === "string" && given.trim()
-            ? given
-            : String(supplied[field.from ?? "title"] ?? source.values[field.from ?? "title"] ?? "");
-        const derived = slugify(basis);
+        const explicit = typeof given === "string" && given.trim() ? given : "";
+        let derived = slugify(explicit || String(supplied[field.from ?? "title"] ?? ""));
+        if (!derived) {
+          // A non-Latin title (Arabic, Chinese…) slugifies to empty, but the
+          // backend still requires a slug on these endpoints. Per product
+          // direction the slug may stay Latin, so take the source row's slug and
+          // append the language — this keeps it unique whether the entity's slug
+          // uniqueness is per-language or global (post/FAQ categories are global,
+          // so a bare copy of the English slug would collide).
+          const sourceSlug = source.values[field.name];
+          const base =
+            (typeof sourceSlug === "string" && sourceSlug) ||
+            slugify(String(source.values[field.from ?? "title"] ?? ""));
+          if (base) derived = `${base}-${targetLanguage}`;
+        }
         if (derived) payload[field.name] = derived;
         break;
       }
@@ -264,22 +274,44 @@ async function writeTranslation(
   const existing = findTranslation(row, languageCode);
 
   if (surface.write.mode === "embedded") {
-    // The step's PUT replaces the whole translation set, so the existing rows
-    // have to be sent back alongside the new one or they are dropped.
+    // The PUT replaces the whole translation set, so every existing row has to
+    // be re-sent alongside the new one or it is dropped. Rebuild each kept row
+    // from this surface's own fields, keyed the way the endpoint expects.
+    const keyOf = (
+      languageIdValue: number | null,
+      code: string,
+    ): Record<string, unknown> =>
+      surface.write.key === "language_id"
+        ? { language_id: languageIdValue }
+        : { language_code: code };
+
+    const fieldNames = surface.fields.map((field) => field.name);
     const kept = row.translations
       .filter((translation) => translation.languageCode !== languageCode.toLowerCase())
-      .map((translation) => ({
-        language_code: translation.languageCode,
-        title: translation.values.title,
-        description: translation.values.description,
-      }));
+      .map((translation) => {
+        const kv: Record<string, unknown> = keyOf(
+          translation.languageId,
+          translation.languageCode,
+        );
+        for (const name of fieldNames) {
+          const value = translation.values[name];
+          if (value !== undefined && value !== null) kv[name] = value;
+        }
+        return kv;
+      });
+
     await put(project, fillPath(surface.write.put, { id: row.id }), {
-      translations: [...kept, { language_code: languageCode, ...payload }],
+      translations: [
+        ...kept,
+        { ...keyOf(languageId, languageCode), ...payload },
+      ],
     });
     return existing ? "updated" : "created";
   }
 
-  if (existing && existing.languageId !== null) {
+  // When the endpoint has a per-language PUT and the row already exists, update
+  // it. Media has no PUT — its POST upserts — so it always falls through to POST.
+  if (existing && existing.languageId !== null && surface.write.update) {
     await put(
       project,
       fillPath(surface.write.update, {
@@ -296,7 +328,7 @@ async function writeTranslation(
     ...payload,
     [surface.write.key]: surface.write.key === "language_id" ? languageId : languageCode,
   });
-  return "created";
+  return existing ? "updated" : "created";
 }
 
 // --- Tools -------------------------------------------------------------------
@@ -849,57 +881,17 @@ export function registerTranslateTools(server: McpServer): void {
       guard(async () => {
         const source = (source_language_code ?? getProject(project).defaultLanguage).toLowerCase();
         const target = target_language_code.toLowerCase();
-        const surfaces = selectSurfaces(types).filter((surface) => surface.llm === null);
-
-        const work: Record<string, unknown>[] = [];
-        let remaining = 0;
-        let budget = CHAR_BUDGET;
-
-        for (const surface of surfaces) {
-          let rows: SurfaceRow[];
-          try {
-            rows = (await fetchSurfaceRows(project, surface)).rows;
-          } catch {
-            continue;
-          }
-          const fields = translatableFields(surface);
-
-          for (const row of rows) {
-            const sourceRow = findTranslation(row, source);
-            if (!sourceRow || findTranslation(row, target)) continue;
-
-            if (work.length >= limit || budget <= 0) {
-              remaining += 1;
-              continue;
-            }
-
-            const values: Record<string, unknown> = {};
-            for (const field of fields) {
-              const value = sourceRow.values[field];
-              if (typeof value === "string" && value.trim()) values[field] = value;
-            }
-            if (Object.keys(values).length === 0) continue;
-
-            budget -= JSON.stringify(values).length;
-            work.push({
-              type: surface.type,
-              id: row.id,
-              ...(row.parentId === undefined ? {} : { parent_id: row.parentId }),
-              label: row.label,
-              fields: values,
-            });
-          }
-        }
+        const { items, remaining } = await collectWorklist(project, source, target, types, limit);
 
         return ok({
           project,
           source_language_code: source,
           target_language_code: target,
-          returned: work.length,
+          returned: items.length,
           more_remaining: remaining,
-          items: work,
+          items,
           note:
-            work.length === 0
+            items.length === 0
               ? "Nothing left — every agent-translated row already has this language."
               : "Translate each item's `fields` into " +
                 `'${target}' and pass them back to save_translations with the same type, id ` +
@@ -953,72 +945,7 @@ export function registerTranslateTools(server: McpServer): void {
 
         const target = language_code.toLowerCase();
         const source = (source_language_code ?? getProject(project).defaultLanguage).toLowerCase();
-        const languageIds = await resolveLanguageIds(project, [target]);
-        const languageId = languageIds.get(target);
-        if (languageId === undefined) return fail(`'${target}' is not an active language.`);
-        const locales = await getActiveLanguageCodes(project);
-
-        const results: Record<string, unknown>[] = [];
-        const byType = new Map<string, typeof items>();
-        for (const item of items) {
-          const group = byType.get(item.type) ?? [];
-          group.push(item);
-          byType.set(item.type, group);
-        }
-
-        for (const [type, group] of byType) {
-          const surface = getSurface(type);
-          // One list call per type serves every item of that type: we need the
-          // source row's verbatim columns and whether the language row exists.
-          const { rows } = await fetchSurfaceRows(project, surface);
-          const byId = new Map(rows.map((row) => [row.id, row]));
-
-          for (const item of group) {
-            const row = byId.get(item.id);
-            if (!row) {
-              results.push({ type, id: item.id, saved: false, error: "row not found" });
-              continue;
-            }
-            const sourceRow = findTranslation(row, source);
-            if (!sourceRow) {
-              results.push({
-                type,
-                id: item.id,
-                saved: false,
-                error: `no '${source}' row to copy non-prose fields from`,
-              });
-              continue;
-            }
-
-            try {
-              const payload = await composePayload({
-                project,
-                surface,
-                source: sourceRow,
-                supplied: item.fields,
-                targetLanguage: target,
-                locales,
-                localizeUrls: localize_urls,
-              });
-              const outcome = await writeTranslation(
-                project,
-                surface,
-                row,
-                target,
-                languageId,
-                payload,
-              );
-              results.push({ type, id: item.id, label: row.label, saved: true, outcome });
-            } catch (error) {
-              results.push({
-                type,
-                id: item.id,
-                saved: false,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }
-          }
-        }
+        const results = await saveItems(project, target, source, items, localize_urls);
 
         const saved = results.filter((result) => result.saved === true).length;
         return ok({
@@ -1036,8 +963,148 @@ export function registerTranslateTools(server: McpServer): void {
   );
 }
 
+
 /** Rough cap on how much source text one worklist call hands back. */
 const CHAR_BUDGET = 60_000;
+
+interface WorkItem {
+  type: string;
+  id: number;
+  parent_id?: number;
+  label: string;
+  fields: Record<string, string>;
+}
+
+/**
+ * Gather the source strings of agent-translated rows still missing a language.
+ * Factored out so translation_worklist can hand them to the agent.
+ */
+async function collectWorklist(
+  project: ProjectId,
+  source: string,
+  target: string,
+  types: string[] | undefined,
+  limit: number,
+): Promise<{ items: WorkItem[]; remaining: number }> {
+  const surfaces = selectSurfaces(types).filter((surface) => surface.llm === null);
+  const items: WorkItem[] = [];
+  let remaining = 0;
+  let budget = CHAR_BUDGET;
+
+  for (const surface of surfaces) {
+    let rows: SurfaceRow[];
+    try {
+      rows = (await fetchSurfaceRows(project, surface)).rows;
+    } catch {
+      continue;
+    }
+    const fields = translatableFields(surface);
+
+    for (const row of rows) {
+      const sourceRow = findTranslation(row, source);
+      if (!sourceRow || findTranslation(row, target)) continue;
+
+      if (items.length >= limit || budget <= 0) {
+        remaining += 1;
+        continue;
+      }
+
+      const values: Record<string, string> = {};
+      for (const field of fields) {
+        const value = sourceRow.values[field];
+        if (typeof value === "string" && value.trim()) values[field] = value;
+      }
+      if (Object.keys(values).length === 0) continue;
+
+      budget -= JSON.stringify(values).length;
+      items.push({
+        type: surface.type,
+        id: row.id,
+        ...(row.parentId === undefined ? {} : { parent_id: row.parentId }),
+        label: row.label,
+        fields: values,
+      });
+    }
+  }
+  return { items, remaining };
+}
+
+/** Write already-translated items back. Factored out of save_translations. */
+async function saveItems(
+  project: ProjectId,
+  target: string,
+  source: string,
+  items: Array<{ type: string; id: number; parent_id?: number; fields: Record<string, string> }>,
+  localizeUrls: boolean,
+): Promise<Record<string, unknown>[]> {
+  const languageIds = await resolveLanguageIds(project, [target]);
+  const languageId = languageIds.get(target);
+  if (languageId === undefined) throw new Error(`'${target}' is not an active language.`);
+  const locales = await getActiveLanguageCodes(project);
+
+  const results: Record<string, unknown>[] = [];
+  const byType = new Map<string, typeof items>();
+  for (const item of items) {
+    const group = byType.get(item.type) ?? [];
+    group.push(item);
+    byType.set(item.type, group);
+  }
+
+  for (const [type, group] of byType) {
+    const surface = getSurface(type);
+    // One list call per type serves every item of that type: we need the source
+    // row's verbatim columns and whether the language row already exists.
+    const { rows } = await fetchSurfaceRows(project, surface);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+
+    for (const item of group) {
+      const row = byId.get(item.id);
+      if (!row) {
+        results.push({ type, id: item.id, saved: false, error: "row not found" });
+        continue;
+      }
+      const sourceRow = findTranslation(row, source);
+      if (!sourceRow) {
+        results.push({
+          type,
+          id: item.id,
+          saved: false,
+          error: `no '${source}' row to copy non-prose fields from`,
+        });
+        continue;
+      }
+
+      try {
+        const payload = await composePayload({
+          project,
+          surface,
+          source: sourceRow,
+          supplied: item.fields,
+          targetLanguage: target,
+          locales,
+          localizeUrls,
+        });
+        const outcome = await writeTranslation(
+          project,
+          surface,
+          row,
+          target,
+          languageId,
+          payload,
+        );
+        results.push({ type, id: item.id, label: row.label, saved: true, outcome });
+      } catch (error) {
+        results.push({
+          type,
+          id: item.id,
+          saved: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+  return results;
+}
 
 function countTypes(items: BatchItem[]): Record<string, number> {
   const counts: Record<string, number> = {};

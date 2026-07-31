@@ -58,20 +58,26 @@ async function listAll(
   let totalPages = 1;
 
   do {
-    const response = await get<Envelope<Row | Row[]>>(project, path, {
+    const response = await get<Record<string, unknown>>(project, path, {
       page,
       limit: PAGE_LIMIT,
     });
-    // A few endpoints (before/after-AI steps) return the rows as `data` itself
-    // rather than under a key, and have no pagination envelope at all.
-    if (Array.isArray(response.data)) {
-      return { rows: asRows(response.data), truncated: false };
+
+    // Three envelope shapes in the wild:
+    //   - data is the row array, pagination beside it   (media)
+    //   - data is the row array, no pagination at all   (before/after-AI steps)
+    //   - data is an object with the rows under `key`    (everything else)
+    const dataRaw = response.data;
+    let reported: unknown;
+    if (Array.isArray(dataRaw)) {
+      rows.push(...asRows(dataRaw));
+      reported = response.total_pages;
+    } else {
+      const data = asRow(dataRaw) ?? {};
+      rows.push(...asRows(data[key]));
+      reported = data.total_pages;
     }
 
-    const data = asRow(response.data) ?? {};
-    rows.push(...asRows(data[key]));
-
-    const reported = data.total_pages;
     totalPages = typeof reported === "number" && reported > 0 ? reported : 1;
     page += 1;
   } while (page <= totalPages && page <= MAX_PAGES);

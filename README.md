@@ -73,9 +73,9 @@ Each brand is logged into separately — a token for IC does not work against AH
 | `create_post_draft` / `update_post_translation` / `add_translation` / `set_post_metadata` | ✓* | Author a post (draft-first) |
 | `publish_post` / `unpublish_post` | ✓* | Go live (SEO-gated) / return to draft |
 | `auto_translate` / `_status` / `_rollback` | ✓* | Machine-translate one post, service or page |
-| `translation_coverage` | ✓ | What is untranslated, across all 30 surfaces |
+| `translation_coverage` | ✓ | What is untranslated, across all 32 surfaces |
 | `translate_everything` / `_status` | ✓* | Brand-wide sweep, throttled |
-| `translation_worklist` / `save_translations` | ✓* | The surfaces no endpoint translates |
+| `translation_worklist` / `save_translations` | ✓* | The surfaces no backend endpoint translates |
 | `create_post_category` / `add_category_translation` | ✓* | Create/translate a category |
 | `create_tag` / `add_tag_translation` | ✓* | Create/translate a tag |
 | `list_post_faqs` / `add_post_faq` / `add_faq_translation` / `delete_faq` | ✓* | A post's FAQ block + FAQPage schema |
@@ -99,12 +99,23 @@ Underneath it, a brand's content splits in two:
 - **Posts, services and pages** have a backend endpoint that runs the
   translation server-side (DeepSeek), re-localises internal links, caps meta at
   SEO sizes and emits ASCII slugs. `translate_everything` queues those.
-- **The other 27 surfaces** — taxonomy, FAQs, cards, heroes, sliders, packages,
+- **The other 29 surfaces** — taxonomy, FAQs, cards, heroes, sliders, packages,
   price comparisons, processes, promotional landings, before/afters, forms,
-  menus, footers, global settings — have translation CRUD and nothing else. No
-  endpoint translates them. So the agent holding the session is the translator:
-  `translation_worklist` hands it the source strings, `save_translations` writes
-  its rendering back.
+  menus, footers, global settings, CTA link buttons, image alt text — have
+  translation CRUD and nothing else. No endpoint translates them, so the agent
+  holding the session is the translator: `translation_worklist` hands it the
+  source strings, `save_translations` writes its rendering back. This is the
+  idiomatic MCP split — the server is the hands, the model is the translator.
+  (For an unattended, no-agent bulk pass, the right move is a backend
+  auto-translate endpoint for these types, like posts/services/pages already
+  have — not a second LLM inside the MCP.)
+
+  Two of these don't go through a `/translations` endpoint at all: **CTA links**
+  and **before/after-AI steps** carry their languages inside the row, written by
+  PUTting the whole set back (`save_translations` re-sends the other languages so
+  they aren't dropped). **Image alt text** is the one high-volume surface — the
+  media library is far larger than the content, so translating it is best run as
+  its own pass (`types: ["media"]`) rather than folded into a content sweep.
 
 `save_translations` deliberately does not accept everything. Slugs are derived
 from the translated title the way the backend derives them, internal URLs are
