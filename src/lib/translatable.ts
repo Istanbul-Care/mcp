@@ -486,15 +486,6 @@ export const SURFACES: TranslatableSurface[] = [
     fields: [t("label"), url("url")],
   },
   {
-    type: "footer",
-    label: "Footer",
-    llm: null,
-    source: { path: "/admin/footers", key: "footers" },
-    write: endpoint("/admin/footers"),
-    titleField: "cta_button_text",
-    fields: [t("cta_button_text"), url("cta_button_url")],
-  },
-  {
     type: "global_setting",
     label: "Global settings",
     llm: null,
@@ -563,7 +554,14 @@ export const SURFACES: TranslatableSurface[] = [
  * `scripts/check-translatable.mjs` reads this, so "not covered" is a recorded
  * decision rather than something that quietly fell off the list.
  */
-export const UNCOVERED: Record<string, string> = {};
+export const UNCOVERED: Record<string, string> = {
+  "/admin/footers/{}/translations":
+    "Footer is a nested tree now (CTA + sections + items), not a flat row, so it " +
+    "does not fit the generic worklist/save model. It has a dedicated bulk " +
+    "endpoint (POST /admin/footers/{}/translations/bulk) and dedicated tools " +
+    "(footer_worklist / save_footer). The flat POST .../translations still exists " +
+    "but we don't use it for translation sweeps.",
+};
 
 export const SURFACE_TYPES = SURFACES.map((surface) => surface.type) as [
   string,
