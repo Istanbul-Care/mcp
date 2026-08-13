@@ -1,3 +1,7 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+
 import type { ProjectId } from "../config/projects.js";
 
 export interface AuthedUser {
@@ -26,6 +30,59 @@ const sessions = new Map<ProjectId, Session>();
 const challenges = new Map<ProjectId, PendingChallenge>();
 
 const EXPIRY_SKEW_MS = 30_000;
+
+/**
+ * Where authenticated sessions are cached so they survive an MCP server
+ * restart (an external redeploy would otherwise drop the in-memory JWT and
+ * force a fresh OTP login mid-operation). Override with ICMCP_SESSION_FILE.
+ * Holds bearer tokens at rest — written 0600 — so it trades a little of the
+ * OTP-per-login guarantee for restart resilience. Set ICMCP_PERSIST_SESSIONS=0
+ * to disable entirely.
+ */
+// Read env lazily (not at module load) so tests can toggle persistence off
+// after import without the fake token leaking to the real session file.
+const persistEnabled = (): boolean => process.env.ICMCP_PERSIST_SESSIONS !== "0";
+const sessionFile = (): string =>
+  process.env.ICMCP_SESSION_FILE ||
+  join(homedir(), ".ic-content-mcp", "sessions.json");
+
+/** Reload persisted, still-valid sessions on startup. Best-effort. */
+function loadSessions(): void {
+  const SESSION_FILE = sessionFile();
+  if (!persistEnabled() || !existsSync(SESSION_FILE)) return;
+  try {
+    const raw = readFileSync(SESSION_FILE, "utf8");
+    const data = JSON.parse(raw) as Record<string, Session>;
+    const now = Date.now();
+    for (const [project, session] of Object.entries(data)) {
+      if (session?.token && session.expiresAt - EXPIRY_SKEW_MS > now) {
+        sessions.set(project as ProjectId, session);
+      }
+    }
+  } catch {
+    // Corrupt / unreadable cache is non-fatal — start with no sessions.
+  }
+}
+
+/** Persist the current (non-expired) sessions to disk. Best-effort, never throws. */
+function persistSessions(): void {
+  if (!persistEnabled()) return;
+  try {
+    const SESSION_FILE = sessionFile();
+    const now = Date.now();
+    const out: Record<string, Session> = {};
+    for (const [project, session] of sessions) {
+      if (session.expiresAt - EXPIRY_SKEW_MS > now) out[project] = session;
+    }
+    const dir = dirname(SESSION_FILE);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+    writeFileSync(SESSION_FILE, JSON.stringify(out), { mode: 0o600 });
+  } catch {
+    // Disk unavailable / read-only — persistence is a bonus, not a requirement.
+  }
+}
+
+loadSessions();
 
 export function setChallenge(project: ProjectId, challenge: PendingChallenge): void {
   challenges.set(project, challenge);
@@ -65,6 +122,7 @@ export function setSession(
     user,
   });
   challenges.delete(project);
+  persistSessions();
 }
 
 export function getSession(project: ProjectId): Session | undefined {
@@ -72,6 +130,7 @@ export function getSession(project: ProjectId): Session | undefined {
   if (!session) return undefined;
   if (session.expiresAt - EXPIRY_SKEW_MS <= Date.now()) {
     sessions.delete(project);
+    persistSessions();
     return undefined;
   }
   return session;
@@ -80,6 +139,7 @@ export function getSession(project: ProjectId): Session | undefined {
 export function clearSession(project: ProjectId): void {
   sessions.delete(project);
   challenges.delete(project);
+  persistSessions();
 }
 
 export function getToken(project: ProjectId): string | null {

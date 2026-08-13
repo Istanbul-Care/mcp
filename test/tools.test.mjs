@@ -66,7 +66,9 @@ before(() => {
   ]) {
     register(server);
   }
-  // Seed auth + write gate so the write tools proceed.
+  // Seed auth + write gate so the write tools proceed. Disable session
+  // persistence so the fake test token never touches the real session file.
+  process.env.ICMCP_PERSIST_SESSIONS = "0";
   process.env.ICMCP_WRITE_PROJECTS = PROJECT;
   setSession(PROJECT, "test-token", 60, {
     id: 1,

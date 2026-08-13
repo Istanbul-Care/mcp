@@ -59,6 +59,46 @@ interface RequestOptions {
   timeoutMs?: number;
 }
 
+const MAX_ATTEMPTS = 3;
+/** Gateway statuses that usually mean the request never reached the app. */
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * fetch with a short exponential backoff. Retries only failures that are
+ * safe to repeat: connection errors (the request never landed) and gateway
+ * 5xx (502/503/504) — both typical of a backend that is restarting/deploying.
+ * 4xx and application 500s are deterministic and are NOT retried. This lets a
+ * brief backend blip pass without aborting a long translation run.
+ */
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      // Fresh timeout signal per attempt — a reused aborted signal would fail.
+      const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+      if (RETRYABLE_STATUS.has(response.status) && attempt < MAX_ATTEMPTS) {
+        await sleep(300 * 2 ** (attempt - 1)); // 300ms, 600ms
+        continue;
+      }
+      return response;
+    } catch (error) {
+      // Network-level failure (ECONNREFUSED, socket hang up, DNS) or timeout.
+      lastError = error;
+      if (attempt < MAX_ATTEMPTS) {
+        await sleep(300 * 2 ** (attempt - 1));
+        continue;
+      }
+    }
+  }
+  throw lastError;
+}
+
 export async function request<T>(
   project: ProjectId,
   method: "GET" | "POST" | "PUT" | "DELETE",
@@ -76,12 +116,15 @@ export async function request<T>(
   }
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  const response = await fetchWithRetry(
+    url,
+    {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    },
+    timeoutMs,
+  );
 
   if (!response.ok) {
     // A 401 on an authenticated call means the JWT died mid-session; say so in

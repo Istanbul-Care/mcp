@@ -15,7 +15,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { get, post, put } from "../api/client.js";
+import { get, post, put, ApiError } from "../api/client.js";
 import { getProject, type ProjectId } from "../config/projects.js";
 import { slugify } from "../lib/slug.js";
 import { resolveInternalLink } from "../lib/links.js";
@@ -324,11 +324,36 @@ async function writeTranslation(
     return "updated";
   }
 
-  await post(project, fillPath(surface.write.create, { id: row.id, parent: row.parentId }), {
-    ...payload,
-    [surface.write.key]: surface.write.key === "language_id" ? languageId : languageCode,
-  });
-  return existing ? "updated" : "created";
+  try {
+    await post(project, fillPath(surface.write.create, { id: row.id, parent: row.parentId }), {
+      ...payload,
+      [surface.write.key]: surface.write.key === "language_id" ? languageId : languageCode,
+    });
+    return existing ? "updated" : "created";
+  } catch (error) {
+    // The list endpoint can omit a translation row that the backend actually
+    // holds — e.g. a half-written row left by an interrupted run — so `existing`
+    // reads false and we POST, which the backend rejects as a duplicate. Fall
+    // back to the per-language PUT to update the orphaned row in place.
+    if (
+      error instanceof ApiError &&
+      error.status === 400 &&
+      /already exist/i.test(error.detail) &&
+      surface.write.update
+    ) {
+      await put(
+        project,
+        fillPath(surface.write.update, {
+          id: row.id,
+          parent: row.parentId,
+          language: languageId,
+        }),
+        payload,
+      );
+      return "updated";
+    }
+    throw error;
+  }
 }
 
 // --- Tools -------------------------------------------------------------------
