@@ -17,6 +17,8 @@ import { registerCardTools } from "../dist/tools/cards.js";
 import { registerFormTools } from "../dist/tools/forms.js";
 import { registerChatbotTools } from "../dist/tools/chatbot.js";
 import { registerHeaderTools } from "../dist/tools/header.js";
+import { registerSeoTools } from "../dist/tools/seo.js";
+import { registerComponentTools } from "../dist/tools/components.js";
 
 const PROJECT = "staging";
 const handlers = new Map();
@@ -59,6 +61,8 @@ before(() => {
     registerFormTools,
     registerChatbotTools,
     registerHeaderTools,
+    registerSeoTools,
+    registerComponentTools,
   ]) {
     register(server);
   }
@@ -232,6 +236,141 @@ test("upload_media: reads a local file and POSTs multipart to /admin/media", asy
   assert.equal(c.method, "POST");
   assert.ok(c.url.endsWith("/admin/media"));
   assert.ok(c.body instanceof FormData);
+});
+
+test("create_video_schema: builds a VideoObject JSON-LD and POSTs it", async () => {
+  const r = await call("create_video_schema", {
+    project: PROJECT,
+    content_type: "page",
+    specific_id: 42,
+    name: "Hair Transplant Result",
+    description: "12-month timeline.",
+    thumbnail_url: "https://x/thumb.jpg",
+    upload_date: "2026-08-13",
+    embed_url: "https://youtube.com/embed/abc",
+    duration_seconds: 95,
+  });
+  assert.ok(!isError(r));
+  const c = lastCall();
+  assert.equal(c.method, "POST");
+  assert.ok(c.url.endsWith("/admin/seo-schemas"));
+  const body = lastBody();
+  assert.equal(body.content_type, "page");
+  assert.equal(body.is_specific, true);
+  assert.equal(body.specific_id, 42);
+  assert.equal(body.schema_data["@type"], "VideoObject");
+  assert.equal(body.schema_data.duration, "PT1M35S"); // 95s → 1m35s
+  assert.equal(body.schema_data.embedUrl, "https://youtube.com/embed/abc");
+});
+
+test("create_seo_schema: POST with a raw JSON-LD object", async () => {
+  await call("create_seo_schema", {
+    project: PROJECT,
+    content_type: "service",
+    schema_data: { "@type": "Service" },
+    is_default: true,
+  });
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/seo-schemas"));
+  assert.equal(lastBody().is_default, true);
+});
+
+test("delete_seo_schema: DELETE /admin/seo-schemas/{id}", async () => {
+  await call("delete_seo_schema", { project: PROJECT, schema_id: 7 });
+  assert.equal(lastCall().method, "DELETE");
+  assert.ok(lastCall().url.endsWith("/admin/seo-schemas/7"));
+});
+
+test("create_redirect: POST /admin/redirects forwarding source/target/method", async () => {
+  // NB: the stub server bypasses zod, so pass method explicitly (no default applied here).
+  await call("create_redirect", {
+    project: PROJECT,
+    source_url: "/old",
+    target_url: "/new",
+    method: "301",
+  });
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/redirects"));
+  const body = lastBody();
+  assert.equal(body.source_url, "/old");
+  assert.equal(body.method, "301");
+});
+
+test("create_hero: wraps text fields into a translation object", async () => {
+  await call("create_hero", {
+    project: PROJECT,
+    language_id: 22,
+    clinic_rank: "No.1",
+    title: "Best Clinic",
+    subtitle: "sub",
+    button_text: "Book",
+    button_url: "/book",
+  });
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/heroes"));
+  const body = lastBody();
+  assert.equal(body.translation.title, "Best Clinic");
+  assert.equal(body.translation.language_id, 22);
+});
+
+test("create_google_map_section: nests title/cta into translation", async () => {
+  await call("create_google_map_section", {
+    project: PROJECT,
+    googlemap_url: "https://maps/x",
+    phone_number: "+90",
+    email: "a@b.c",
+    social_media_id: "ic",
+    language_id: 22,
+    title: "Contact",
+    description: "d",
+    cta_button_text: "Call",
+    cta_button_url: "/call",
+  });
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/google-map-sections"));
+  assert.equal(lastBody().translation.cta_button_text, "Call");
+});
+
+test("create_package: nests title into translation", async () => {
+  await call("create_package", { project: PROJECT, language_id: 22, title: "VIP" });
+  assert.ok(lastCall().url.endsWith("/admin/packages"));
+  assert.equal(lastBody().translation.title, "VIP");
+});
+
+test("update_package: PUT /admin/packages/{id} with price", async () => {
+  await call("update_package", { project: PROJECT, package_id: 3, price: 2500 });
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/packages/3"));
+  assert.equal(lastBody().price, 2500);
+});
+
+test("list_price_compares: GET /admin/price-compares", async () => {
+  await call("list_price_compares", { project: PROJECT });
+  assert.equal(lastCall().method, "GET");
+  assert.ok(lastCall().url.includes("/admin/price-compares"));
+});
+
+test("delete_before_after: DELETE /admin/before-afters/{id}", async () => {
+  await call("delete_before_after", { project: PROJECT, before_after_id: 9 });
+  assert.equal(lastCall().method, "DELETE");
+  assert.ok(lastCall().url.endsWith("/admin/before-afters/9"));
+});
+
+test("create_global_setting: nests contact block into translation", async () => {
+  await call("create_global_setting", {
+    project: PROJECT,
+    robots_txt_content: "User-agent: *",
+    llms_txt_content: "# llms",
+    site_url: "https://x",
+    language_id: 22,
+    address: "Istanbul",
+    phone_number: "+90",
+    cta_text: "Book",
+    cta_url: "/book",
+  });
+  assert.ok(lastCall().url.endsWith("/admin/global-settings"));
+  assert.equal(lastBody().translation.address, "Istanbul");
+  assert.equal(lastBody().site_url, "https://x");
 });
 
 test("write gate: a write tool refuses when the brand is not write-enabled", async () => {

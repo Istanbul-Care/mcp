@@ -21,6 +21,7 @@ import { registerCardTools } from "./tools/cards.js";
 import { registerFormTools } from "./tools/forms.js";
 import { registerChatbotTools } from "./tools/chatbot.js";
 import { registerHeaderTools } from "./tools/header.js";
+import { registerComponentTools } from "./tools/components.js";
 import { registerTranslatePrompt } from "./prompts/translate-brand.js";
 
 const server = new McpServer(
@@ -57,6 +58,7 @@ registerCardTools(server);
 registerFormTools(server);
 registerChatbotTools(server);
 registerHeaderTools(server);
+registerComponentTools(server);
 registerTranslatePrompt(server);
 
 async function main(): Promise<void> {
