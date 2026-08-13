@@ -1,14 +1,14 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { get, put } from "../api/client.js";
+import { get, post, put } from "../api/client.js";
 import type {
   Envelope,
   ServiceDetail,
   ServiceListData,
   SeoAuditData,
 } from "../api/types.js";
-import { slugify, isValidSlug, auditSlug } from "../lib/slug.js";
+import { slugify, isValidSlug, auditSlug, coerceSlug } from "../lib/slug.js";
 import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
 
 /** Blocking SEO checks — shared with posts. */
@@ -66,6 +66,80 @@ export function registerServiceTools(server: McpServer): void {
               full_path: t.full_path,
             })),
           })),
+        });
+      }),
+  );
+
+  server.registerTool(
+    "create_service",
+    {
+      title: "Create a service (draft)",
+      description:
+        "Creates a service in ONE language as a draft — invisible on the public site until " +
+        "published. A service's body lives in its cards, so pass card_ids to attach existing " +
+        "cards (or add them later). The slug is the bare leaf; the site composes the routable " +
+        "path from the category chain. Add other languages with the translation tools. " +
+        "Requires login and a write-enabled brand.",
+      inputSchema: {
+        project: projectParam,
+        language_id: z.number().int().describe("Language of this first translation. See list_languages."),
+        title: z.string().min(1).max(255),
+        slug: z
+          .string()
+          .min(1)
+          .max(255)
+          .describe("Lowercase ASCII, hyphens only — the leaf slug, no category prefix."),
+        excerpt: z.string().min(1),
+        meta_title: z.string().max(255).optional(),
+        meta_description: z.string().max(255).optional(),
+        focus_keyword: z.string().max(255).optional(),
+        canonical_url: z.string().max(255).optional(),
+        robots_index: z.boolean().default(true),
+        robots_follow: z.boolean().default(true),
+        category_ids: z.array(z.number().int()).optional(),
+        card_ids: z.array(z.number().int()).optional().describe("Existing cards to attach as the body."),
+        featured_image_id: z.number().int().optional(),
+        banner_image_id: z.number().int().optional(),
+        sort_order: z.number().int().optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({
+      project,
+      language_id,
+      category_ids,
+      card_ids,
+      featured_image_id,
+      banner_image_id,
+      sort_order,
+      ...translation
+    }) =>
+      guard(async () => {
+        const blocked = ensureWritable(project);
+        if (blocked) return fail(blocked);
+
+        const { slug: cleanSlug, corrected } = coerceSlug(translation.slug);
+        translation.slug = cleanSlug;
+
+        const response = await post<Envelope<ServiceDetail>>(project, "/admin/services", {
+          translation: { language_id, ...translation },
+          category_ids,
+          card_ids,
+          featured_image_id,
+          banner_image_id,
+          sort_order,
+          status: "draft",
+        });
+        return ok({
+          project,
+          created: true,
+          service_id: response.data.id,
+          status: response.data.status,
+          ...(corrected ? { slug_corrected_to: cleanSlug } : {}),
+          next_steps: [
+            "Add other languages: auto_translate or update_service_translation",
+            "Attach body cards via card_ids (or the card tools)",
+          ],
         });
       }),
   );

@@ -123,6 +123,45 @@ export function put<T>(
   return request<T>(project, "PUT", path, { body, auth });
 }
 
+export function del<T>(project: ProjectId, path: string, auth = true): Promise<T> {
+  return request<T>(project, "DELETE", path, { auth });
+}
+
+/**
+ * Multipart POST for the media endpoints, which take file uploads. Deliberately
+ * does NOT set Content-Type — fetch derives the multipart boundary from the
+ * FormData itself, and an explicit header would break the boundary.
+ */
+export async function postForm<T>(
+  project: ProjectId,
+  path: string,
+  form: FormData,
+  auth = true,
+  timeoutMs = 120_000,
+): Promise<T> {
+  const url = buildUrl(project, path);
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (auth) {
+    const token = getToken(project);
+    if (!token) throw new AuthRequiredError(project);
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: form,
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401 && auth) throw new AuthRequiredError(project);
+    throw new ApiError(response.status, await extractDetail(response), url);
+  }
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
 /**
  * Encode a slug path for use as a URL path segment sequence.
  *

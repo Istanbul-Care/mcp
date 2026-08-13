@@ -15,6 +15,12 @@ import { registerServiceTools } from "./tools/services.js";
 import { registerBulkAuditTools } from "./tools/bulk-audit.js";
 import { registerGuideTools } from "./tools/guides.js";
 import { registerFooterTools } from "./tools/footer.js";
+import { registerMediaTools } from "./tools/media.js";
+import { registerPageTools } from "./tools/pages.js";
+import { registerCardTools } from "./tools/cards.js";
+import { registerFormTools } from "./tools/forms.js";
+import { registerChatbotTools } from "./tools/chatbot.js";
+import { registerHeaderTools } from "./tools/header.js";
 import { registerTranslatePrompt } from "./prompts/translate-brand.js";
 
 const server = new McpServer(
@@ -45,6 +51,12 @@ registerServiceTools(server);
 registerBulkAuditTools(server);
 registerGuideTools(server);
 registerFooterTools(server);
+registerMediaTools(server);
+registerPageTools(server);
+registerCardTools(server);
+registerFormTools(server);
+registerChatbotTools(server);
+registerHeaderTools(server);
 registerTranslatePrompt(server);
 
 async function main(): Promise<void> {
