@@ -27,6 +27,18 @@ test("slugify: non-Latin script yields empty (the Arabic case)", () => {
   assert.equal(slugify("زراعة الشعر"), "");
 });
 
+test("slugify: apostrophes are removed, not hyphenated", () => {
+  assert.equal(slugify("What You'll Really Pay"), "what-youll-really-pay");
+  assert.equal(slugify("What You’ll Really Pay"), "what-youll-really-pay");
+  assert.equal(slugify("Perché scegliere l'Albania"), "perche-scegliere-lalbania");
+  assert.equal(slugify("Rock ’n’ Roll"), "rock-n-roll");
+});
+
+test("slugify: stroked letters transliterate instead of vanishing", () => {
+  assert.equal(slugify("Łupież vs Sucha Skóra Głowy"), "lupiez-vs-sucha-skora-glowy");
+  assert.equal(slugify("włosów"), "wlosow");
+});
+
 test("isValidSlug: only lowercase ascii + hyphens", () => {
   assert.ok(isValidSlug("hair-transplant"));
   assert.ok(!isValidSlug("Hair-Transplant"));

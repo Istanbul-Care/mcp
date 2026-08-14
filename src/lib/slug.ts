@@ -20,6 +20,8 @@ const TRANSLITERATION_MAP: Record<string, string> = {
 
 const COMBINING_MARKS = /[̀-ͯ]/g;
 
+const APOSTROPHES = /['‘’ʹʻʼʽ`´′]/g;
+
 export function slugify(value: string): string {
   return value
     .split("")
@@ -28,6 +30,7 @@ export function slugify(value: string): string {
     .normalize("NFD")
     .replace(COMBINING_MARKS, "")
     .toLowerCase()
+    .replace(APOSTROPHES, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }

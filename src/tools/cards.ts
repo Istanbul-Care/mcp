@@ -9,7 +9,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { post, put, del } from "../api/client.js";
+import { get, post, put, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
 import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
 
@@ -17,7 +17,76 @@ interface CreatedCard {
   id: number;
 }
 
+/** One card as the admin list returns it — translations are filtered to the requested language. */
+interface CardListRow {
+  id: number;
+  translations?: Array<{
+    language?: { code?: string } | null;
+    title?: string | null;
+    description?: string | null;
+    button_text?: string | null;
+    button_url?: string | null;
+  }>;
+}
+
+interface CardListData {
+  cards?: CardListRow[];
+  total?: number;
+  total_pages?: number;
+  page?: number;
+}
+
 export function registerCardTools(server: McpServer): void {
+  server.registerTool(
+    "list_cards",
+    {
+      title: "List cards (paginated, for translation)",
+      description:
+        "Pages through every card, returning each card's id and its text in ONE language (the " +
+        "source). Use this to translate cards: the admin card list filters translations to a " +
+        "single language, so the coverage/worklist tools cannot tell which cards already have a " +
+        "given language — page through with this instead and translate each card once via " +
+        "save_translations. Returns total_pages so you know when to stop. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(50),
+        language_id: z
+          .number()
+          .int()
+          .optional()
+          .describe("Which language's text to return; omit for the brand default (the source)."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ project, page, limit, language_id }) =>
+      guard(async () => {
+        const response = await get<Envelope<CardListData>>(project, "/admin/cards", {
+          page,
+          limit,
+          language_id,
+        });
+        const data = response.data;
+        const cards = (data.cards ?? []).map((card) => {
+          const tr = card.translations?.[0];
+          const fields: Record<string, string> = {};
+          if (tr?.title) fields.title = tr.title;
+          if (tr?.description) fields.description = tr.description;
+          if (tr?.button_text) fields.button_text = tr.button_text;
+          if (tr?.button_url) fields.button_url = tr.button_url;
+          return { id: card.id, fields };
+        });
+        return ok({
+          project,
+          page: data.page ?? page,
+          total: data.total,
+          total_pages: data.total_pages,
+          returned: cards.length,
+          cards,
+        });
+      }),
+  );
+
   server.registerTool(
     "create_card",
     {
