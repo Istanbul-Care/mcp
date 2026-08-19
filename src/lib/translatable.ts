@@ -33,6 +33,13 @@ export interface TranslatableField {
   from?: string;
   /** Soft cap the backend enforces on SEO fields. */
   maxLength?: number;
+  /**
+   * For `url`: store the localized link as a bare slug path — no domain, no
+   * locale prefix, no surrounding slashes (`hair-transplant/dhi`). The frontend
+   * prepends the current locale to header menu urls itself, so a `/ar/…` or
+   * absolute value bypasses its locale handling and escapes the language.
+   */
+  bare?: boolean;
 }
 
 /**
@@ -98,6 +105,7 @@ const t = (name: string, maxLength?: number): TranslatableField =>
   maxLength === undefined ? { name, kind: "text" } : { name, kind: "text", maxLength };
 const html = (name: string): TranslatableField => ({ name, kind: "html" });
 const url = (name: string): TranslatableField => ({ name, kind: "url" });
+const bareUrl = (name: string): TranslatableField => ({ name, kind: "url", bare: true });
 const verbatim = (name: string): TranslatableField => ({ name, kind: "verbatim" });
 const slug = (from: string): TranslatableField => ({ name: "slug", kind: "slug", from });
 
@@ -167,6 +175,7 @@ export const SURFACES: TranslatableSurface[] = [
       t("title"),
       slug("title"),
       t("excerpt"),
+      html("content"),
       t("meta_title", META_TITLE_MAX),
       t("meta_description", META_DESCRIPTION_MAX),
       t("focus_keyword"),
@@ -483,7 +492,7 @@ export const SURFACES: TranslatableSurface[] = [
       key: "language_id",
     },
     titleField: "label",
-    fields: [t("label"), url("url")],
+    fields: [t("label"), bareUrl("url")],
   },
   {
     type: "global_setting",

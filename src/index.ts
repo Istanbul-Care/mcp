@@ -23,6 +23,7 @@ import { registerChatbotTools } from "./tools/chatbot.js";
 import { registerHeaderTools } from "./tools/header.js";
 import { registerComponentTools } from "./tools/components.js";
 import { registerTranslatePrompt } from "./prompts/translate-brand.js";
+import { registerLoginPrompt } from "./prompts/login.js";
 
 const server = new McpServer(
   { name: "istanbul-care-content", version: "0.1.0" },
@@ -60,6 +61,7 @@ registerChatbotTools(server);
 registerHeaderTools(server);
 registerComponentTools(server);
 registerTranslatePrompt(server);
+registerLoginPrompt(server);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();

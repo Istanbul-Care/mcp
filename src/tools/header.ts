@@ -72,7 +72,13 @@ export function registerHeaderTools(server: McpServer): void {
         header_id: z.number().int().describe("From list_headers."),
         language_id: z.number().int(),
         label: z.string().describe("Menu text."),
-        url: z.string().describe("Where it links."),
+        url: z
+          .string()
+          .describe(
+            "Where it links. For internal pages pass a bare slug path " +
+              "('hair-transplant/dhi') — no domain, no locale prefix; the frontend " +
+              "prepends the current locale itself, so absolute URLs escape the language.",
+          ),
         item_type: z.string().default("link").describe("e.g. 'link' or 'dropdown'."),
         parent_id: z.number().int().optional().describe("Parent item id, for dropdown children."),
         order: z.number().int().optional(),

@@ -182,12 +182,18 @@ async function localizeUrl(
   value: unknown,
   targetLanguage: string,
   locales: readonly string[],
+  bare = false,
 ): Promise<unknown> {
   if (typeof value !== "string" || !value.trim()) return value;
   const resolved = await resolveInternalLink(project, value, targetLanguage, locales);
   // An unresolvable href is almost always external (or already dead); keeping
   // the source value is the conservative move — this is not a link fixer.
-  return resolved.resolved && resolved.url ? resolved.url : value;
+  if (!resolved.resolved || !resolved.url) return value;
+  if (!bare) return resolved.url;
+  const stripped = resolved.url
+    .replace(new RegExp(`^/${targetLanguage}(?=/|$)`), "")
+    .replace(/^\/+|\/+$/g, "");
+  return stripped || resolved.url;
 }
 
 interface ComposeOptions {
@@ -241,7 +247,7 @@ async function composePayload(options: ComposeOptions): Promise<Record<string, u
       case "url": {
         const base = given ?? source.values[field.name];
         payload[field.name] = localizeUrls
-          ? await localizeUrl(project, base, targetLanguage, locales)
+          ? await localizeUrl(project, base, targetLanguage, locales, field.bare)
           : base;
         break;
       }

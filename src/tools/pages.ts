@@ -62,10 +62,18 @@ type SectionKey = (typeof SECTION_KEYS)[number];
 
 type PageSections = Partial<Record<SectionKey, OrderedItem[]>>;
 
+/** The page's rich-text body block: layout here, the text itself per language. */
+interface PageContentBlock {
+  enabled?: boolean;
+  order?: number;
+  grid_columns?: number;
+}
+
 interface PageDetail extends PageListItem, PageSections {
   header_id?: number | null;
   footer_id?: number | null;
   featured_image_id?: number | null;
+  page_content?: PageContentBlock | null;
 }
 
 /** Reduce a section's ordered items to the minimal {id, order, grid_columns}. */
@@ -147,6 +155,7 @@ export function registerPageTools(server: McpServer): void {
           header_id: pageDetail.header_id,
           footer_id: pageDetail.footer_id,
           featured_image_id: pageDetail.featured_image_id,
+          page_content: pageDetail.page_content ?? null,
           sections,
           translations: pageDetail.translations.map((t) => ({
             language: t.language.code,
@@ -253,6 +262,18 @@ export function registerPageTools(server: McpServer): void {
         sliders: orderedItems.optional(),
         contact_forms: orderedItems.optional(),
         multi_page_forms: orderedItems.optional(),
+        page_content: z
+          .object({
+            enabled: z.boolean(),
+            order: z.number().int().min(0).optional(),
+            grid_columns: z.number().int().min(1).max(12).optional(),
+          })
+          .optional()
+          .describe(
+            "The page's rich-text body block — layout only (enabled/order/grid_columns). " +
+              "The text itself is per language: write it to the `content` field via " +
+              "save_translations with type 'page'.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
