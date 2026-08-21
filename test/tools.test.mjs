@@ -744,3 +744,149 @@ test("translation_coverage: footer is included when no types are given", async (
     "an unnarrowed sweep left the footer out",
   );
 });
+
+/*
+ * The service dropdown is keyed by a query param, not by path, so it needs a
+ * fetch that reads language_id — the point of the test is precisely that an
+ * empty option list for one language is a gap and not a success.
+ */
+function serviceOptionFetch({ sourceOptions, targetOptions }) {
+  return async (url, opts = {}) => {
+    const href = String(url);
+    calls.push({ url: href, method: opts.method, body: opts.body, headers: opts.headers });
+    const parsed = new URL(href);
+    const path = parsed.pathname;
+    let payload = { status: "success", data: {} };
+
+    if (path.includes("/admin/languages")) {
+      payload = EN_AR_LANGUAGES;
+    } else if (path.includes("/service-options")) {
+      const languageId = parsed.searchParams.get("language_id");
+      payload = {
+        status: "success",
+        data: languageId === "45" ? targetOptions : sourceOptions,
+      };
+    } else if (path.includes("/admin/contact-form")) {
+      payload = {
+        status: "success",
+        data: {
+          contact_form: [
+            {
+              id: 3,
+              translations: [{ language: { id: 22, code: "en" }, title: "Reach Us Now" }],
+            },
+          ],
+          total: 1,
+          page: 1,
+          limit: 100,
+          total_pages: 1,
+        },
+      };
+    }
+
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+}
+
+const EN_SERVICE_OPTIONS = [
+  { id: 1, contact_form_id: 3, language_id: 22, name: "Hair Transplant", code: "hair-transplant", sort_order: 0 },
+  { id: 10, contact_form_id: 3, language_id: 22, name: "Dental", code: "dental", sort_order: 1 },
+];
+
+test("translation_coverage: an empty service dropdown counts as missing", async () => {
+  globalThis.fetch = serviceOptionFetch({
+    sourceOptions: EN_SERVICE_OPTIONS,
+    targetOptions: [],
+  });
+  setSession(FOOTER_PROJECT, "test-token", 60, {
+    id: 1,
+    email: "t@t.com",
+    full_name: "Test",
+    role: "admin",
+  });
+
+  const r = await call("translation_coverage", {
+    project: FOOTER_PROJECT,
+    source_language_code: "en",
+    target_language_codes: ["ar"],
+    types: ["contact_form_options"],
+    include_items: true,
+  });
+  assert.ok(!isError(r));
+  const out = JSON.parse(r.content[0].text);
+
+  const row = out.by_type.find((entry) => entry.type === "contact_form_options");
+  assert.ok(row, "coverage did not report the contact form dropdown");
+  assert.equal(row.rows, 1);
+  assert.equal(row.missing.ar, 1);
+  assert.equal(row.missing_items.ar[0].id, 3);
+  assert.equal(out.missing_totals.ar, 1);
+  assert.equal(out.by_type.length, 1, "narrowing fell through to other surfaces");
+});
+
+test("translation_coverage: a filled service dropdown is not reported missing", async () => {
+  globalThis.fetch = serviceOptionFetch({
+    sourceOptions: EN_SERVICE_OPTIONS,
+    targetOptions: [
+      { id: 60, contact_form_id: 3, language_id: 45, name: "زراعة الشعر", code: "hair-transplant", sort_order: 0 },
+      { id: 61, contact_form_id: 3, language_id: 45, name: "طب الأسنان", code: "dental", sort_order: 1 },
+    ],
+  });
+  setSession(FOOTER_PROJECT, "test-token", 60, {
+    id: 1,
+    email: "t@t.com",
+    full_name: "Test",
+    role: "admin",
+  });
+
+  const r = await call("translation_coverage", {
+    project: FOOTER_PROJECT,
+    source_language_code: "en",
+    target_language_codes: ["ar"],
+    types: ["contact_form_options"],
+  });
+  assert.ok(!isError(r));
+  const out = JSON.parse(r.content[0].text);
+  const row = out.by_type.find((entry) => entry.type === "contact_form_options");
+  assert.ok(row);
+  assert.equal(row.missing.ar, 0);
+  assert.equal(out.missing_totals.ar ?? 0, 0);
+});
+
+test("save_contact_form_options: posts one row per option and keeps code verbatim", async () => {
+  globalThis.fetch = serviceOptionFetch({ sourceOptions: EN_SERVICE_OPTIONS, targetOptions: [] });
+  setSession(FOOTER_PROJECT, "test-token", 60, {
+    id: 1,
+    email: "t@t.com",
+    full_name: "Test",
+    role: "admin",
+  });
+  calls.length = 0;
+
+  const savedGate = process.env.ICMCP_WRITE_PROJECTS;
+  process.env.ICMCP_WRITE_PROJECTS = `${savedGate},${FOOTER_PROJECT}`;
+  const r = await call("save_contact_form_options", {
+    project: FOOTER_PROJECT,
+    contact_form_id: 3,
+    language_code: "ar",
+    options: [
+      { name: "زراعة الشعر", code: "hair-transplant", sort_order: 0 },
+      { name: "طب الأسنان", code: "dental", sort_order: 1 },
+    ],
+  });
+  process.env.ICMCP_WRITE_PROJECTS = savedGate;
+  assert.ok(!isError(r), r.content?.[0]?.text);
+
+  const posts = calls.filter((c) => c.method === "POST" && c.url.includes("/service-options"));
+  assert.equal(posts.length, 2);
+  const bodies = posts.map((c) => JSON.parse(c.body));
+  assert.deepEqual(
+    bodies.map((b) => b.code),
+    ["hair-transplant", "dental"],
+    "code must be sent unchanged — it is the value submitted with the lead",
+  );
+  assert.ok(bodies.every((b) => b.language_id === 45));
+});

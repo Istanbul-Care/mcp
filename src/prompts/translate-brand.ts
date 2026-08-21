@@ -3,11 +3,13 @@
  *
  * Registered as an MCP prompt so it surfaces as a slash command in the client
  * rather than as one more tool the model has to piece together. The sweep is
- * three loops — the backend's LLM for posts/services/pages, the agent itself for
- * everything else, and the footer's own nested flow — and getting them in the
- * right order matters, so the order lives here instead of in whoever happens to
- * be asking. The footer has its own step because it is the one surface
- * translation_worklist cannot reach, which makes it the easiest one to miss.
+ * four loops — the backend's LLM for posts/services/pages, the agent itself for
+ * everything else, the footer's own nested flow, and the contact form's service
+ * dropdown — and getting them in the right order matters, so the order lives
+ * here instead of in whoever happens to be asking. The footer and the dropdown
+ * have their own steps because they are the surfaces translation_worklist
+ * cannot reach, which makes them the easiest ones to miss; both fail silently,
+ * rendering as source-language text or as an empty <select>.
  */
 
 import { z } from "zod";
@@ -95,7 +97,18 @@ export function registerTranslatePrompt(server: McpServer): void {
                 "   Repeat until footer_worklist returns 0. Skipping this leaves the footer in",
                 "   the source language on every page of the site.",
                 "",
-                `6. Finish with translation_coverage again and show me what is still missing`,
+                "6. The contact form's service-category dropdown is a third special case. Its",
+                "   options hang off the form itself, one row per form and language, so neither",
+                "   translation_worklist nor the service_category surface covers them — and a",
+                "   language with no rows renders as an EMPTY dropdown rather than an error:",
+                `     contact_form_options_worklist({ project: "${project}", target_language_code: "${language}"${from} })`,
+                "   translate ONLY `name`. Send `code`, `sort_order` and `zapier_custom_id` back",
+                "   unchanged — `code` is the value submitted with the lead and is the same in",
+                "   every language, so changing it breaks lead routing and Zapier mapping. Then",
+                `     save_contact_form_options({ project: "${project}", contact_form_id: <id>, language_code: "${language}", options: [...] })`,
+                "   Repeat until the worklist returns 0.",
+                "",
+                `7. Finish with translation_coverage again and show me what is still missing`,
                 "   and why. Anything auto-translated was created as a draft — tell me what",
                 "   needs review before it goes live rather than publishing it yourself.",
               ].join("\n"),

@@ -288,3 +288,80 @@ export function measureCoverage(
     unsourced,
   };
 }
+
+export interface ContactFormOptionCoverage {
+  /** Contact forms that have any options in the source language. */
+  total: number;
+  /** Forms whose option list is empty in that language, keyed by language code. */
+  missing: Record<string, SurfaceRow[]>;
+  /** Forms with no options in the source language — nothing to translate from. */
+  unsourced: SurfaceRow[];
+}
+
+/**
+ * The contact form's service-category dropdown.
+ *
+ * These options are NOT the `service_category` surface: they live on the form
+ * itself, one row per (form, language), and the public payload simply returns
+ * an empty list for a language that has none. That renders as a dropdown with
+ * no choices rather than as an error, so it has to be measured explicitly —
+ * `translation_worklist` cannot see it.
+ */
+export async function scanContactFormOptions(
+  project: ProjectId,
+  sourceLanguage: string,
+  targets: string[],
+  languageIds: Map<string, number>,
+): Promise<ContactFormOptionCoverage> {
+  const { rows: forms } = await listAll(project, "/admin/contact-form", "contact_form");
+  const source = sourceLanguage.toLowerCase();
+  const sourceId = languageIds.get(source);
+  const missing: Record<string, SurfaceRow[]> = {};
+  const unsourced: SurfaceRow[] = [];
+  let total = 0;
+
+  for (const form of forms) {
+    if (typeof form.id !== "number") continue;
+    const label = labelFor(form, readTranslations(form), "title");
+    const row: SurfaceRow = { id: form.id, label, translations: [] };
+
+    const sourceOptions = sourceId === undefined ? [] : await readOptions(project, form.id, sourceId);
+    if (sourceOptions.length === 0) {
+      unsourced.push(row);
+      continue;
+    }
+    total += 1;
+    row.translations.push({
+      languageId: sourceId ?? null,
+      languageCode: source,
+      values: { options: sourceOptions.length },
+    });
+
+    for (const target of targets) {
+      const code = target.toLowerCase();
+      const targetId = languageIds.get(code);
+      if (targetId === undefined) continue;
+      const options = await readOptions(project, form.id, targetId);
+      if (options.length > 0) {
+        row.translations.push({
+          languageId: targetId,
+          languageCode: code,
+          values: { options: options.length },
+        });
+        continue;
+      }
+      (missing[code] ??= []).push(row);
+    }
+  }
+
+  return { total, missing, unsourced };
+}
+
+async function readOptions(project: ProjectId, formId: number, languageId: number): Promise<Row[]> {
+  const response = await get<Envelope<Row[]>>(
+    project,
+    `/admin/contact-form/${formId}/service-options`,
+    { language_id: languageId },
+  );
+  return asRows(response.data);
+}

@@ -163,6 +163,17 @@ Underneath it, a brand's content splits in two:
   silent: an untranslated footer shows on every page of the site, which makes it
   both the most conspicuous gap and the easiest one to leave behind.
 
+- **The contact form's service dropdown is a fourth case.** Those options are
+  not the `service_category` taxonomy — they hang off the contact form, one row
+  per form and language, so nothing in `SURFACES` reaches them. Use
+  `contact_form_options_worklist` / `save_contact_form_options`, translating only
+  `name`: `code` is the value submitted with the lead and is identical in every
+  language, so rewriting it breaks lead routing and Zapier mapping.
+  `translation_coverage` reports it as type `contact_form_options`, because the
+  public API returns an *empty list* rather than an error for a language with no
+  rows — the form renders with a dropdown that has nothing in it, and a lead
+  arrives with no service category attached.
+
 `save_translations` deliberately does not accept everything. Slugs are derived
 from the translated title the way the backend derives them, internal URLs are
 re-pointed at the target language through the slug lookup, and non-prose columns

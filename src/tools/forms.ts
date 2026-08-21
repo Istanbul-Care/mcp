@@ -8,9 +8,10 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { post, del } from "../api/client.js";
+import { get, post, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { getProject, type ProjectId } from "../config/projects.js";
+import { ok, fail, guard, projectParam, ensureWritable, resolveLanguageIds } from "./helpers.js";
 
 interface Created {
   id: number;
@@ -127,4 +128,183 @@ export function registerFormTools(server: McpServer): void {
         return ok({ project, multi_page_form_id, deleted: true });
       }),
   );
+
+  /*
+   * The service-category dropdown.
+   *
+   * These options hang off the contact form, one row per (form, language) —
+   * they are NOT the `service_category` taxonomy, and the translation registry
+   * cannot see them. A language with no rows gets an EMPTY dropdown in the
+   * public payload rather than an error, so the form silently loses a field.
+   */
+  server.registerTool(
+    "contact_form_options_worklist",
+    {
+      title: "Read a contact form's service-dropdown options for translating",
+      description:
+        "Returns each contact form whose service-category dropdown is empty in the target " +
+        "language, with the source-language options to translate. These options live on the " +
+        "form (one row per form + language), so translation_worklist does NOT cover them and a " +
+        "missing language renders as an empty dropdown, not an error. Translate only `name` " +
+        "and pass the rows to save_contact_form_options. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        target_language_code: z.string().min(2).describe("The language to produce, e.g. 'ar'."),
+        source_language_code: z
+          .string()
+          .optional()
+          .describe("Language to translate FROM. Defaults to the brand's default language."),
+        overwrite: z
+          .boolean()
+          .default(false)
+          .describe("Return forms even if the target language already has options."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ project, target_language_code, source_language_code, overwrite }) =>
+      guard(async () => {
+        const source = (source_language_code ?? getProject(project).defaultLanguage).toLowerCase();
+        const target = target_language_code.toLowerCase();
+        const ids = await resolveLanguageIds(project, [source, target]);
+        const sourceId = ids.get(source)!;
+        const targetId = ids.get(target)!;
+
+        const list = await get<Envelope<{ contact_form: { id: number }[] }>>(
+          project,
+          "/admin/contact-form",
+          { limit: 100 },
+        );
+        const work: Record<string, unknown>[] = [];
+
+        for (const form of list.data.contact_form ?? []) {
+          const existing = await readServiceOptions(project, form.id, targetId);
+          if (existing.length > 0 && !overwrite) continue;
+
+          const options = await readServiceOptions(project, form.id, sourceId);
+          if (options.length === 0) continue;
+
+          work.push({
+            contact_form_id: form.id,
+            source_language_code: source,
+            already_present: existing.length,
+            options: options.map((option) => ({
+              code: option.code,
+              name: option.name,
+              sort_order: option.sort_order,
+              zapier_custom_id: option.zapier_custom_id ?? null,
+            })),
+          });
+        }
+
+        return ok({
+          project,
+          source_language_code: source,
+          target_language_code: target,
+          returned: work.length,
+          forms: work,
+          note:
+            work.length === 0
+              ? "Every contact form already has service options in this language."
+              : "Translate ONLY `name`. Send `code`, `sort_order` and `zapier_custom_id` back " +
+                "unchanged — `code` is the value submitted with the lead and must match the " +
+                "other languages, or lead routing and Zapier mapping break.",
+        });
+      }),
+  );
+
+  server.registerTool(
+    "save_contact_form_options",
+    {
+      title: "Write a contact form's service-dropdown options for one language",
+      description:
+        "Creates the service-category dropdown options for one contact form in one language. " +
+        "Pass the rows from contact_form_options_worklist with `name` translated and `code` / " +
+        "`sort_order` / `zapier_custom_id` unchanged. Requires login and a write-enabled brand.",
+      inputSchema: {
+        project: projectParam,
+        contact_form_id: z.number().int(),
+        language_code: z.string().min(2).describe("The language these options are IN."),
+        options: z
+          .array(
+            z.object({
+              name: z.string().min(1).describe("The translated label shown in the dropdown."),
+              code: z
+                .string()
+                .min(1)
+                .describe("Language-INVARIANT value submitted with the lead. Copy it verbatim."),
+              sort_order: z.number().int().default(0),
+              zapier_custom_id: z.string().nullable().optional(),
+            }),
+          )
+          .min(1),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, contact_form_id, language_code, options }) =>
+      guard(async () => {
+        const blocked = ensureWritable(project);
+        if (blocked) return fail(blocked);
+
+        const target = language_code.toLowerCase();
+        const ids = await resolveLanguageIds(project, [target]);
+        const languageId = ids.get(target)!;
+
+        const saved: number[] = [];
+        const failed: { code: string; error: string }[] = [];
+        for (const option of options) {
+          try {
+            const response = await post<Envelope<Created>>(
+              project,
+              `/admin/contact-form/${contact_form_id}/service-options`,
+              {
+                language_id: languageId,
+                name: option.name,
+                code: option.code,
+                sort_order: option.sort_order,
+                ...(option.zapier_custom_id === undefined
+                  ? {}
+                  : { zapier_custom_id: option.zapier_custom_id }),
+              },
+            );
+            saved.push(response.data.id);
+          } catch (error) {
+            failed.push({
+              code: option.code,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+
+        return ok({
+          project,
+          contact_form_id,
+          language_code: target,
+          saved: saved.length,
+          failed: failed.length,
+          option_ids: saved,
+          ...(failed.length > 0 ? { failures: failed } : {}),
+        });
+      }),
+  );
+}
+
+interface ServiceOption {
+  id: number;
+  name: string;
+  code: string;
+  sort_order: number;
+  zapier_custom_id?: string | null;
+}
+
+async function readServiceOptions(
+  project: ProjectId,
+  formId: number,
+  languageId: number,
+): Promise<ServiceOption[]> {
+  const response = await get<Envelope<ServiceOption[]>>(
+    project,
+    `/admin/contact-form/${formId}/service-options`,
+    { language_id: languageId },
+  );
+  return response.data ?? [];
 }

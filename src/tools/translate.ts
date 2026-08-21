@@ -31,6 +31,7 @@ import {
   findTranslation,
   measureCoverage,
   scanFooters,
+  scanContactFormOptions,
   type SurfaceRow,
   type TranslationRow,
 } from "../lib/translation-scan.js";
@@ -170,7 +171,11 @@ async function resolveTargets(
  * sweep can be narrowed to it, and filtered out before surface selection.
  */
 const FOOTER_TYPE = "footer";
-const COVERAGE_TYPES = [...SURFACE_TYPES, FOOTER_TYPE] as [string, ...string[]];
+const FORM_OPTIONS_TYPE = "contact_form_options";
+const COVERAGE_TYPES = [...SURFACE_TYPES, FOOTER_TYPE, FORM_OPTIONS_TYPE] as [
+  string,
+  ...string[],
+];
 
 function selectSurfaces(types: string[] | undefined): TranslatableSurface[] {
   if (!types || types.length === 0) return SURFACES;
@@ -554,8 +559,9 @@ export function registerTranslateTools(server: McpServer): void {
         const targets = await resolveTargets(project, source, target_language_codes);
         const narrowed = types !== undefined && types.length > 0;
         const wantsFooter = !narrowed || types.includes(FOOTER_TYPE);
+        const wantsFormOptions = !narrowed || types.includes(FORM_OPTIONS_TYPE);
         const surfaceTypes = narrowed
-          ? types.filter((type) => type !== FOOTER_TYPE)
+          ? types.filter((type) => type !== FOOTER_TYPE && type !== FORM_OPTIONS_TYPE)
           : undefined;
         // Asking for the footer alone must not fall through to "all surfaces".
         const surfaces =
@@ -644,6 +650,46 @@ export function registerTranslateTools(server: McpServer): void {
             }
           } catch (error) {
             failures[FOOTER_TYPE] = error instanceof Error ? error.message : String(error);
+          }
+        }
+
+        if (wantsFormOptions) {
+          try {
+            const ids = await resolveLanguageIds(project, [source, ...targets]);
+            const options = await scanContactFormOptions(project, source, targets, ids);
+            if (options.total > 0) {
+              const missingCounts: Record<string, number> = {};
+              for (const target of targets) {
+                const rowsMissing = options.missing[target] ?? [];
+                missingCounts[target] = rowsMissing.length;
+                totals[target] = (totals[target] ?? 0) + rowsMissing.length;
+              }
+              report.push({
+                type: FORM_OPTIONS_TYPE,
+                label: "Contact form service dropdown",
+                translated_by:
+                  "agent (contact_form_options_worklist / save_contact_form_options)",
+                rows: options.total,
+                missing: missingCounts,
+                no_source_row: options.unsourced.length,
+                ...(include_items
+                  ? {
+                      missing_items: Object.fromEntries(
+                        targets.map((target) => [
+                          target,
+                          (options.missing[target] ?? []).map((row) => ({
+                            id: row.id,
+                            label: row.label,
+                          })),
+                        ]),
+                      ),
+                    }
+                  : {}),
+              });
+            }
+          } catch (error) {
+            failures[FORM_OPTIONS_TYPE] =
+              error instanceof Error ? error.message : String(error);
           }
         }
 
