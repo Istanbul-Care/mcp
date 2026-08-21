@@ -80,8 +80,45 @@ Each brand is logged into separately — a token for IC does not work against AH
 | `create_tag` / `add_tag_translation` | ✓* | Create/translate a tag |
 | `list_post_faqs` / `add_post_faq` / `add_faq_translation` / `delete_faq` | ✓* | A post's FAQ block + FAQPage schema |
 | `list_seo_schemas` / `set_post_seo_schema` | ✓* | Structured data (JSON-LD) |
+| `read_public_page` | – | A published page by slug path, with its real body HTML and full section payloads |
+| `list_pages` / `get_page` | ✓ | Pages with translations / one page's structure and SEO fields |
+| `create_page` / `update_page` | ✓* | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body |
+| `fold_page_cards` | ✓* | Move a page's prose cards into its `page_content` body, byte for byte (previews by default) |
+| `set_page_content` | ✓* | Write a page's body HTML for one language + enable/position the `page_content` block |
+| `get_card` / `get_page_cards` | ✓ | One card in full / a page's cards in render order, with their text and images |
 
 `✓` needs login. `✓*` also needs the brand in `ICMCP_WRITE_PROJECTS` (write gate).
+
+## Turning a page's cards into its rich-text body
+
+Pages used to be composed as a stack of content cards — one card per section,
+each holding a heading and a slab of HTML. The `cards_to_page_content` prompt
+folds that stack into the page's single `page_content` block, one language at a
+time:
+
+```
+/ic-content:cards_to_page_content  project=istanbul-care  page_id=249
+```
+
+The texts are MOVED, not rewritten: each card's `description` is already HTML
+and passes through untouched, its `title` becomes an `<h2>`, and the cards keep
+their render order. Widget cards (`whatsapp`, `media_slider`, `vertical_slider`,
+`testimonial_gallery`, `word_cloud`) mean nothing outside their own rendering,
+so they stay attached. Folded cards are detached from the page after you
+confirm — never deleted, since they may be attached elsewhere. Pass
+`keep_cards=yes` to write the body and leave the cards in place for comparison.
+
+The assembly is done by `fold_page_cards`, in code rather than by the agent —
+retyping thousands of characters of HTML is how wording quietly drifts. It
+defaults to `dry_run`, so the first call always previews. The other tools are
+usable on their own: `get_page_cards` reads a page's cards in render order with
+their full text, `get_card` reads one card, and `set_page_content` writes a
+page's body HTML for one language (re-sending the rest of the translation
+unchanged) for the cases where you do want to hand-author it.
+
+Once the source language is in, `auto_translate` fills the rest from it —
+with `overwrite: true`, since the other languages already have a translation row
+and would otherwise keep an empty body.
 
 ## Translating a brand into a language
 
@@ -101,7 +138,7 @@ Underneath it, a brand's content splits in two:
   SEO sizes and emits ASCII slugs. `translate_everything` queues those.
 - **The other 29 surfaces** — taxonomy, FAQs, cards, heroes, sliders, packages,
   price comparisons, processes, promotional landings, before/afters, forms,
-  menus, footers, global settings, CTA link buttons, image alt text — have
+  menus, global settings, CTA link buttons, image alt text — have
   translation CRUD and nothing else. No endpoint translates them, so the agent
   holding the session is the translator: `translation_worklist` hands it the
   source strings, `save_translations` writes its rendering back. This is the
@@ -116,6 +153,15 @@ Underneath it, a brand's content splits in two:
   they aren't dropped). **Image alt text** is the one high-volume surface — the
   media library is far larger than the content, so translating it is best run as
   its own pass (`types: ["media"]`) rather than folded into a content sweep.
+
+- **The footer is a third case.** It is a nested tree — CTA button, sections,
+  items — so it is not a `SURFACES` row and `translation_worklist` never returns
+  it. It has its own pair, `footer_worklist` / `save_footer`, which clones the
+  section/item structure from the source language and applies your text against
+  the same `source_section_id` / `source_item_id` keys. `translation_coverage`
+  reports it as type `footer` so a sweep that ignores it is visible rather than
+  silent: an untranslated footer shows on every page of the site, which makes it
+  both the most conspicuous gap and the easiest one to leave behind.
 
 `save_translations` deliberately does not accept everything. Slugs are derived
 from the translated title the way the backend derives them, internal URLs are
