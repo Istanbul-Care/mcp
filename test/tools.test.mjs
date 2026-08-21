@@ -19,6 +19,7 @@ import { registerChatbotTools } from "../dist/tools/chatbot.js";
 import { registerHeaderTools } from "../dist/tools/header.js";
 import { registerSeoTools } from "../dist/tools/seo.js";
 import { registerComponentTools } from "../dist/tools/components.js";
+import { registerTranslateTools } from "../dist/tools/translate.js";
 
 const PROJECT = "staging";
 const handlers = new Map();
@@ -63,6 +64,7 @@ before(() => {
     registerHeaderTools,
     registerSeoTools,
     registerComponentTools,
+    registerTranslateTools,
   ]) {
     register(server);
   }
@@ -385,4 +387,360 @@ test("write gate: a write tool refuses when the brand is not write-enabled", asy
   } finally {
     process.env.ICMCP_WRITE_PROJECTS = saved;
   }
+});
+
+// --- cards -> page_content ------------------------------------------------
+
+/** Route the stub fetch by URL so multi-request tools can be exercised. */
+function routedFetch(routes) {
+  return async (url, opts = {}) => {
+    const href = String(url);
+    calls.push({ url: href, method: opts.method, body: opts.body, headers: opts.headers });
+    const path = new URL(href).pathname;
+    const match = Object.entries(routes).find(([fragment]) => path.includes(fragment));
+    const payload = match ? match[1] : { status: "success", data: {} };
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+}
+
+const LANGUAGES = {
+  status: "success",
+  data: { languages: [{ id: 22, name: "English", code: "en", icon: "", order: 1, is_active: true }] },
+};
+
+test("set_page_content: PUTs the body and re-sends the rest of the translation", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/languages": LANGUAGES,
+    "/admin/pages/7/translations/22": { status: "success", data: {} },
+    "/admin/pages/7": {
+      status: "success",
+      data: {
+        id: 7,
+        translations: [
+          {
+            language: { id: 22, code: "en", name: "English" },
+            title: "Cost",
+            slug: "cost",
+            meta_title: "Cost 2026",
+            content: "old",
+            robots_index: true,
+          },
+        ],
+      },
+    },
+  });
+
+  const r = await call("set_page_content", {
+    project: PROJECT,
+    page_id: 7,
+    language_code: "en",
+    content: "<h2>Cost</h2>",
+    page_content: { enabled: true, order: 3, grid_columns: 12 },
+  });
+  assert.ok(!isError(r));
+
+  const write = calls.find(
+    (c) => c.method === "PUT" && c.url.includes("/admin/pages/7/translations/22"),
+  );
+  assert.ok(write, "no translation PUT");
+  const body = JSON.parse(write.body);
+  assert.equal(body.content, "<h2>Cost</h2>");
+  // The untouched columns ride along so the PUT cannot clear them.
+  assert.equal(body.title, "Cost");
+  assert.equal(body.slug, "cost");
+  assert.equal(body.meta_title, "Cost 2026");
+  assert.equal(body.robots_index, true);
+
+  const block = lastCall();
+  assert.equal(block.method, "PUT");
+  assert.ok(block.url.endsWith("/admin/pages/7"));
+  assert.equal(JSON.parse(block.body).page_content.enabled, true);
+});
+
+test("set_page_content: refuses a language the page does not have yet", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/languages": LANGUAGES,
+    "/admin/pages/7": { status: "success", data: { id: 7, translations: [] } },
+  });
+  const r = await call("set_page_content", {
+    project: PROJECT,
+    page_id: 7,
+    language_code: "en",
+    content: "<p>x</p>",
+  });
+  assert.ok(isError(r));
+  assert.ok(!calls.some((c) => c.method === "PUT"), "must not write");
+});
+
+test("get_page_cards: resolves each attached card in render order", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/pages/7": {
+      status: "success",
+      data: {
+        id: 7,
+        cards: [
+          { id: 12, order: 2, grid_columns: 12 },
+          { id: 11, order: 1, grid_columns: 6 },
+        ],
+      },
+    },
+    "/admin/cards/11": {
+      status: "success",
+      data: {
+        id: 11,
+        type: "content",
+        translations: [
+          { language: { id: 22, code: "en", name: "English" }, title: "First", description: "<p>a</p>" },
+          { language: { id: 35, code: "de", name: "Deutsch" }, title: "Erste", description: "<p>b</p>" },
+        ],
+      },
+    },
+    "/admin/cards/12": {
+      status: "success",
+      data: { id: 12, type: "whatsapp", translations: [] },
+    },
+  });
+
+  const r = await call("get_page_cards", { project: PROJECT, page_id: 7, language_code: "en" });
+  assert.ok(!isError(r));
+  const data = JSON.parse(r.content[0].text);
+  assert.deepEqual(
+    data.cards.map((c) => c.id),
+    [11, 12],
+  );
+  assert.equal(data.cards[0].translations.length, 1);
+  assert.equal(data.cards[0].translations[0].title, "First");
+  assert.equal(data.cards[1].type, "whatsapp");
+});
+
+test("fold_page_cards: dry run builds the body without writing anything", async () => {
+  const PAGE = {
+    status: "success",
+    data: {
+      id: 9,
+      translations: [
+        { language: { id: 22, code: "en", name: "English" }, title: "Cost", slug: "cost", content: "" },
+      ],
+      cards: [
+        { id: 21, order: 1, grid_columns: 12 },
+        { id: 20, order: 0, grid_columns: 12 },
+        { id: 22, order: 2, grid_columns: 6 },
+      ],
+    },
+  };
+  const card = (id, type, title, description) => ({
+    status: "success",
+    data: {
+      id,
+      type,
+      translations: [{ language: { id: 22, code: "en", name: "English" }, title, description }],
+    },
+  });
+  globalThis.fetch = routedFetch({
+    "/admin/languages": LANGUAGES,
+    "/admin/cards/20": card(20, "default", "First", "<p>one</p>"),
+    "/admin/cards/21": card(21, "content", "Second", "<p>two</p>"),
+    "/admin/cards/22": card(22, "whatsapp", "Chat", "<p>nope</p>"),
+    "/admin/pages/9": PAGE,
+  });
+
+  const r = await call("fold_page_cards", { project: PROJECT, page_id: 9, dry_run: true });
+  assert.ok(!isError(r));
+  const data = JSON.parse(r.content[0].text);
+  assert.deepEqual(data.folded_cards.map((c) => c.id), [20, 21]);
+  assert.deepEqual(data.kept_cards.map((c) => c.id), [22]);
+  assert.ok(data.languages[0].preview.includes("<h2>First</h2>\n<p>one</p>"));
+  assert.ok(!calls.some((c) => c.method === "PUT"), "dry run must not write");
+});
+
+test("fold_page_cards: writes the body, sets the block and detaches the folded cards", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/languages": LANGUAGES,
+    "/admin/cards/20": {
+      status: "success",
+      data: {
+        id: 20,
+        type: "default",
+        translations: [
+          { language: { id: 22, code: "en", name: "English" }, title: "First", description: "<p>one</p>" },
+        ],
+      },
+    },
+    "/admin/cards/22": { status: "success", data: { id: 22, type: "whatsapp", translations: [] } },
+    "/admin/pages/9": {
+      status: "success",
+      data: {
+        id: 9,
+        translations: [
+          { language: { id: 22, code: "en", name: "English" }, title: "Cost", slug: "cost", content: "" },
+        ],
+        cards: [
+          { id: 20, order: 3, grid_columns: 12 },
+          { id: 22, order: 4, grid_columns: 6 },
+        ],
+      },
+    },
+  });
+
+  const r = await call("fold_page_cards", {
+    project: PROJECT,
+    page_id: 9,
+    dry_run: false,
+    detach_cards: true,
+  });
+  assert.ok(!isError(r));
+
+  const write = calls.find((c) => c.method === "PUT" && c.url.includes("/translations/22"));
+  assert.ok(write, "no body written");
+  assert.equal(JSON.parse(write.body).content, "<h2>First</h2>\n<p>one</p>");
+  assert.equal(JSON.parse(write.body).slug, "cost");
+
+  const structure = lastCall();
+  assert.equal(structure.method, "PUT");
+  assert.ok(structure.url.endsWith("/admin/pages/9"));
+  const body = JSON.parse(structure.body);
+  assert.equal(body.page_content.enabled, true);
+  assert.equal(body.page_content.order, 3, "block takes the first folded card's slot");
+  assert.deepEqual(body.cards, [{ id: 22, order: 4, grid_columns: 6 }], "widget card survives");
+});
+
+test("fold_page_cards: refuses to clobber an existing body without overwrite", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/languages": LANGUAGES,
+    "/admin/cards/20": {
+      status: "success",
+      data: {
+        id: 20,
+        type: "default",
+        translations: [
+          { language: { id: 22, code: "en", name: "English" }, title: "T", description: "<p>x</p>" },
+        ],
+      },
+    },
+    "/admin/pages/9": {
+      status: "success",
+      data: {
+        id: 9,
+        translations: [
+          { language: { id: 22, code: "en", name: "English" }, title: "Cost", slug: "cost", content: "<p>already here</p>" },
+        ],
+        cards: [{ id: 20, order: 0, grid_columns: 12 }],
+      },
+    },
+  });
+
+  const r = await call("fold_page_cards", { project: PROJECT, page_id: 9, dry_run: false });
+  assert.ok(!isError(r));
+  const data = JSON.parse(r.content[0].text);
+  assert.match(data.languages[0].skipped, /overwrite/);
+  assert.ok(!calls.some((c) => c.method === "PUT"), "must not write");
+});
+
+// --- footer coverage ---------------------------------------------------------
+// The footer is not a SURFACES row (it is a nested CTA/section/item tree with
+// its own footer_worklist / save_footer flow), so translation_coverage used to
+// omit it entirely and report "nothing missing" for a surface it never read.
+
+// A project of its own: resolveLanguageIds caches the language list per
+// project, and the shared PROJECT is already cached as English-only by the
+// tests above.
+const FOOTER_PROJECT = "estemoon";
+
+const EN_AR_LANGUAGES = {
+  status: "success",
+  data: {
+    languages: [
+      { id: 22, code: "en", name: "English", icon: "", order: 1, is_active: true },
+      { id: 45, code: "ar", name: "Arabic", icon: "", order: 2, is_active: true },
+    ],
+  },
+};
+
+test("translation_coverage: reports the footer as its own type", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/languages": EN_AR_LANGUAGES,
+    "/admin/footers": {
+      status: "success",
+      data: {
+        footers: [
+          // en only → missing ar
+          { id: 6, name: "Main Page Footer", translations: [{ language: { id: 22, code: "en" } }] },
+          // en + ar → complete
+          {
+            id: 7,
+            name: "Landing Footer",
+            translations: [
+              { language: { id: 22, code: "en" } },
+              { language: { id: 45, code: "ar" } },
+            ],
+          },
+        ],
+      },
+    },
+  });
+
+  setSession(FOOTER_PROJECT, "test-token", 60, {
+    id: 1,
+    email: "t@t.com",
+    full_name: "Test",
+    role: "admin",
+  });
+  const r = await call("translation_coverage", {
+    project: FOOTER_PROJECT,
+    source_language_code: "en",
+    target_language_codes: ["ar"],
+    types: ["footer"],
+    include_items: true,
+  });
+  assert.ok(!isError(r));
+  const out = JSON.parse(r.content[0].text);
+
+  const footer = out.by_type.find((row) => row.type === "footer");
+  assert.ok(footer, "coverage did not report a footer row");
+  assert.equal(footer.rows, 2);
+  assert.equal(footer.missing.ar, 1);
+  assert.equal(footer.missing_items.ar[0].id, 6);
+  assert.equal(out.missing_totals.ar, 1);
+
+  // Narrowing to the footer must not fall through to sweeping every surface.
+  assert.equal(out.by_type.length, 1);
+  assert.ok(
+    !calls.some((c) => c.url.includes("/admin/faqs")),
+    "footer-only sweep still walked other surfaces",
+  );
+});
+
+test("translation_coverage: footer is included when no types are given", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/languages": EN_AR_LANGUAGES,
+    "/admin/footers": {
+      status: "success",
+      data: {
+        footers: [
+          { id: 6, name: "Main Page Footer", translations: [{ language: { id: 22, code: "en" } }] },
+        ],
+      },
+    },
+  });
+
+  setSession(FOOTER_PROJECT, "test-token", 60, {
+    id: 1,
+    email: "t@t.com",
+    full_name: "Test",
+    role: "admin",
+  });
+  const r = await call("translation_coverage", {
+    project: FOOTER_PROJECT,
+    source_language_code: "en",
+    target_language_codes: ["ar"],
+  });
+  assert.ok(!isError(r));
+  const out = JSON.parse(r.content[0].text);
+  assert.ok(
+    out.by_type.some((row) => row.type === "footer"),
+    "an unnarrowed sweep left the footer out",
+  );
 });

@@ -184,6 +184,62 @@ export async function fetchSurfaceRows(
   return { rows, truncated };
 }
 
+export interface FooterCoverage {
+  total: number;
+  /** Footers lacking the language, keyed by language code. */
+  missing: Record<string, SurfaceRow[]>;
+  unsourced: SurfaceRow[];
+}
+
+/**
+ * Footers are a nested tree (CTA + sections + items) with their own read/write
+ * flow — `footer_worklist` / `save_footer` — so they are not in the SURFACES
+ * registry and `fetchSurfaceRows` cannot walk them.
+ *
+ * Coverage still has to report them. A footer sits on every page of the site,
+ * so an untranslated one is the most visible gap there is, and leaving it out
+ * of the sweep is precisely how it goes unnoticed: the report says "nothing
+ * missing" because it never looked.
+ */
+export async function scanFooters(
+  project: ProjectId,
+  sourceLanguage: string,
+  targets: string[],
+): Promise<FooterCoverage> {
+  const response = await get<Record<string, unknown>>(project, "/admin/footers", {
+    limit: PAGE_LIMIT,
+  });
+  const data = asRow(response.data) ?? {};
+  const footers = asRows(data.footers);
+
+  const source = sourceLanguage.toLowerCase();
+  const missing: Record<string, SurfaceRow[]> = {};
+  const unsourced: SurfaceRow[] = [];
+
+  for (const footer of footers) {
+    if (typeof footer.id !== "number") continue;
+
+    const translations = readTranslations(footer);
+    const present = new Set(translations.map((translation) => translation.languageCode));
+    const name =
+      typeof footer.name === "string" && footer.name.trim()
+        ? footer.name.trim().slice(0, 80)
+        : `#${footer.id}`;
+    const row: SurfaceRow = { id: footer.id, label: name, translations };
+
+    if (!present.has(source)) {
+      unsourced.push(row);
+      continue;
+    }
+    for (const target of targets) {
+      if (present.has(target.toLowerCase())) continue;
+      (missing[target] ??= []).push(row);
+    }
+  }
+
+  return { total: footers.length, missing, unsourced };
+}
+
 export function findTranslation(
   row: SurfaceRow,
   languageCode: string,

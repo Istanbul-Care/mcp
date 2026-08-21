@@ -3,9 +3,11 @@
  *
  * Registered as an MCP prompt so it surfaces as a slash command in the client
  * rather than as one more tool the model has to piece together. The sweep is
- * two loops — the backend's LLM for posts/services/pages, the agent itself for
- * everything else — and getting them in the right order matters, so the order
- * lives here instead of in whoever happens to be asking.
+ * three loops — the backend's LLM for posts/services/pages, the agent itself for
+ * everything else, and the footer's own nested flow — and getting them in the
+ * right order matters, so the order lives here instead of in whoever happens to
+ * be asking. The footer has its own step because it is the one surface
+ * translation_worklist cannot reach, which makes it the easiest one to miss.
  */
 
 import { z } from "zod";
@@ -77,7 +79,23 @@ export function registerTranslatePrompt(server: McpServer): void {
                 "   were not in the worklist — slugs, URLs, prices, icons and phone numbers",
                 "   are handled for you.",
                 "",
-                `5. Finish with translation_coverage again and show me what is still missing`,
+                "   Cards are the exception to `more_remaining`: the admin card list filters",
+                "   translations to one language, so the worklist cannot see which cards are",
+                "   already done and will keep handing you the same newest ids. Track cards by",
+                `   id instead — list_cards({ project: "${project}", language_id: <${language} id> })`,
+                "   reports how many already have the language, and paging list_cards with and",
+                "   without language_id tells you which ids are still missing.",
+                "",
+                "5. The footer is a nested tree (CTA + sections + items), so translation_worklist",
+                "   does not carry it. Do it with its own pair:",
+                `     footer_worklist({ project: "${project}", target_language_code: "${language}"${from} })`,
+                `   translate each title / label / button_text into ${language}, keeping the same`,
+                "   source_section_id and source_item_id keys, then",
+                `     save_footer({ project: "${project}", footer_id: <id>, language_code: "${language}", ... })`,
+                "   Repeat until footer_worklist returns 0. Skipping this leaves the footer in",
+                "   the source language on every page of the site.",
+                "",
+                `6. Finish with translation_coverage again and show me what is still missing`,
                 "   and why. Anything auto-translated was created as a draft — tell me what",
                 "   needs review before it goes live rather than publishing it yourself.",
               ].join("\n"),

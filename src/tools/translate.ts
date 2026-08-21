@@ -30,6 +30,7 @@ import {
   fetchSurfaceRows,
   findTranslation,
   measureCoverage,
+  scanFooters,
   type SurfaceRow,
   type TranslationRow,
 } from "../lib/translation-scan.js";
@@ -162,6 +163,14 @@ async function resolveTargets(
   }
   return targets;
 }
+
+/**
+ * `translation_coverage` reports one type that is not a SURFACES row: the
+ * footer, which has its own nested read/write flow. It is accepted here so the
+ * sweep can be narrowed to it, and filtered out before surface selection.
+ */
+const FOOTER_TYPE = "footer";
+const COVERAGE_TYPES = [...SURFACE_TYPES, FOOTER_TYPE] as [string, ...string[]];
 
 function selectSurfaces(types: string[] | undefined): TranslatableSurface[] {
   if (!types || types.length === 0) return SURFACES;
@@ -529,7 +538,7 @@ export function registerTranslateTools(server: McpServer): void {
           .optional()
           .describe("Languages to check. Omit for every active language."),
         types: z
-          .array(z.enum(SURFACE_TYPES))
+          .array(z.enum(COVERAGE_TYPES))
           .optional()
           .describe("Restrict to some content types. Omit for all of them."),
         include_items: z
@@ -543,7 +552,14 @@ export function registerTranslateTools(server: McpServer): void {
       guard(async () => {
         const source = (source_language_code ?? getProject(project).defaultLanguage).toLowerCase();
         const targets = await resolveTargets(project, source, target_language_codes);
-        const surfaces = selectSurfaces(types);
+        const narrowed = types !== undefined && types.length > 0;
+        const wantsFooter = !narrowed || types.includes(FOOTER_TYPE);
+        const surfaceTypes = narrowed
+          ? types.filter((type) => type !== FOOTER_TYPE)
+          : undefined;
+        // Asking for the footer alone must not fall through to "all surfaces".
+        const surfaces =
+          narrowed && surfaceTypes!.length === 0 ? [] : selectSurfaces(surfaceTypes);
 
         const report: Record<string, unknown>[] = [];
         const failures: Record<string, string> = {};
@@ -594,6 +610,43 @@ export function registerTranslateTools(server: McpServer): void {
           });
         }
 
+        if (wantsFooter) {
+          try {
+            const footers = await scanFooters(project, source, targets);
+            if (footers.total > 0) {
+              const missingCounts: Record<string, number> = {};
+              for (const target of targets) {
+                const rowsMissing = footers.missing[target] ?? [];
+                missingCounts[target] = rowsMissing.length;
+                totals[target] = (totals[target] ?? 0) + rowsMissing.length;
+              }
+              report.push({
+                type: FOOTER_TYPE,
+                label: "Footer",
+                translated_by: "agent (footer_worklist / save_footer)",
+                rows: footers.total,
+                missing: missingCounts,
+                no_source_row: footers.unsourced.length,
+                ...(include_items
+                  ? {
+                      missing_items: Object.fromEntries(
+                        targets.map((target) => [
+                          target,
+                          (footers.missing[target] ?? []).map((row) => ({
+                            id: row.id,
+                            label: row.label,
+                          })),
+                        ]),
+                      ),
+                    }
+                  : {}),
+              });
+            }
+          } catch (error) {
+            failures[FOOTER_TYPE] = error instanceof Error ? error.message : String(error);
+          }
+        }
+
         return ok({
           project,
           source_language_code: source,
@@ -612,7 +665,9 @@ export function registerTranslateTools(server: McpServer): void {
           note:
             "Types marked 'backend LLM' are filled by translate_everything. Types marked " +
             "'agent' have no machine-translation endpoint — pull them with " +
-            "translation_worklist and write them back with save_translations.",
+            "translation_worklist and write them back with save_translations. The 'footer' " +
+            "row is the exception: it is a nested tree, so use footer_worklist and " +
+            "save_footer for it, not translation_worklist.",
         });
       }),
   );

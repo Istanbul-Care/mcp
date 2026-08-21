@@ -14,16 +14,43 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { get, post, put } from "../api/client.js";
 import type { Envelope, LanguageInfo } from "../api/types.js";
 import { coerceSlug } from "../lib/slug.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import type { ProjectId } from "../config/projects.js";
+import { fetchPageCards, type CardDetail, type CardTranslationDetail } from "./cards.js";
+import { ok, fail, guard, projectParam, ensureWritable, resolveLanguageIds } from "./helpers.js";
 
 interface PageTranslation {
   language: LanguageInfo;
   title: string;
   slug: string;
   full_path?: string | null;
+  excerpt?: string | null;
+  content?: string | null;
   meta_title?: string | null;
   meta_description?: string | null;
+  focus_keyword?: string | null;
+  canonical_url?: string | null;
+  robots_index?: boolean | null;
+  robots_follow?: boolean | null;
+  child_pages_heading?: string | null;
 }
+
+/**
+ * The translation columns a content write has to carry along. The PUT takes the
+ * whole translation, so anything left out risks being cleared — re-send every
+ * field the row already had and only swap `content`.
+ */
+const TRANSLATION_FIELDS = [
+  "title",
+  "slug",
+  "excerpt",
+  "meta_title",
+  "meta_description",
+  "focus_keyword",
+  "canonical_url",
+  "robots_index",
+  "robots_follow",
+  "child_pages_heading",
+] as const;
 
 interface PageListItem {
   id: number;
@@ -84,6 +111,92 @@ function sectionIds(items: OrderedItem[] | undefined): OrderedItem[] {
     ...(item.grid_columns == null ? {} : { grid_columns: item.grid_columns }),
   }));
 }
+
+
+/**
+ * Card types that are prose. Everything else on a page (whatsapp buttons,
+ * sliders, galleries, word clouds) is a widget whose text means nothing outside
+ * its own rendering, so it is never folded into the body.
+ */
+const PROSE_CARD_TYPES = new Set(["content", "default"]);
+
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+function cardText(card: CardDetail, code: string): CardTranslationDetail | undefined {
+  return (card.translations ?? []).find(
+    (row) => row.language?.code?.toLowerCase() === code.toLowerCase(),
+  );
+}
+
+/**
+ * Render one card as the block of HTML it becomes inside the body.
+ *
+ * The card's own HTML is passed through byte for byte — this is a move, not a
+ * rewrite — and only the wrapper (heading, image, button link) is authored here.
+ */
+function cardToHtml(
+  card: CardDetail,
+  text: CardTranslationDetail,
+  headingTag: string | null,
+  code: string,
+): string {
+  const parts: string[] = [];
+  const image = card.image?.url;
+  if (image) {
+    const alts = card.image?.translations ?? [];
+    const alt =
+      alts.find((entry) => entry.language_code?.toLowerCase() === code.toLowerCase())?.alt ??
+      alts[0]?.alt ??
+      text.title ??
+      "";
+    parts.push(`<img src="${image}" alt="${escapeHtml(alt)}" data-media-id="${card.image?.id}">`);
+  }
+  if (headingTag && text.title?.trim()) {
+    parts.push(`<${headingTag}>${escapeHtml(text.title.trim())}</${headingTag}>`);
+  }
+  if (text.description?.trim()) parts.push(text.description.trim());
+  if (text.button_text?.trim() && text.button_url?.trim()) {
+    parts.push(`<p><a href="${text.button_url.trim()}">${escapeHtml(text.button_text.trim())}</a></p>`);
+  }
+  return parts.join("\n");
+}
+
+
+/**
+ * Replace one language's body HTML, carrying the rest of the translation along.
+ * The PUT takes the whole translation, so every column the row already had is
+ * re-sent and only `content` moves.
+ */
+async function writePageContent(
+  project: ProjectId,
+  pageId: number,
+  languageId: number,
+  translation: PageTranslation,
+  content: string,
+): Promise<void> {
+  const body: Record<string, unknown> = { content };
+  for (const field of TRANSLATION_FIELDS) {
+    const value = translation[field];
+    if (value !== undefined && value !== null) body[field] = value;
+  }
+  await put(project, `/admin/pages/${pageId}/translations/${languageId}`, body);
+}
+
+const pageContentParam = z
+  .object({
+    enabled: z.boolean(),
+    order: z.number().int().min(0).optional(),
+    grid_columns: z.number().int().min(1).max(12).optional(),
+  })
+  .describe(
+    "The page's rich-text body block — layout only (enabled/order/grid_columns). " +
+      "The text itself is per language: pass it as `content` on create_page, or write " +
+      "it to the `content` field via save_translations with type 'page'.",
+  );
 
 export function registerPageTools(server: McpServer): void {
   server.registerTool(
@@ -165,8 +278,43 @@ export function registerPageTools(server: McpServer): void {
             full_path: t.full_path,
             meta_title: t.meta_title,
             meta_description: t.meta_description,
+            content_chars: (t.content ?? "").length,
           })),
         });
+      }),
+  );
+
+  server.registerTool(
+    "read_public_page",
+    {
+      title: "Read a published page (public API)",
+      description:
+        "Fetches a page the way the public site does — by its slug path, no login. Unlike " +
+        "get_page, this returns the actual per-language body: the page_content block carries " +
+        "its raw HTML when enabled, and every section (heroes, cards, sliders…) comes with " +
+        "its full payload. Use it to read a reference page's real content, e.g. before " +
+        "recreating it elsewhere. Only published pages resolve; drafts 404.",
+      inputSchema: {
+        project: projectParam,
+        path: z
+          .string()
+          .min(1)
+          .describe("The slug path from the public URL, e.g. 'procedures' or 'about/team' — no leading slash, no language prefix."),
+        language: z
+          .string()
+          .optional()
+          .describe("Language code, e.g. 'de'. Omit for the brand's default language."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ project, path, language }) =>
+      guard(async () => {
+        const cleanPath = path.replace(/^\/+|\/+$/g, "");
+        const endpoint = language
+          ? `/${language}/pages/${cleanPath}`
+          : `/pages/${cleanPath}`;
+        const response = await get<Envelope<unknown>>(project, endpoint, undefined, false);
+        return ok({ project, path: cleanPath, page: response.data });
       }),
   );
 
@@ -175,10 +323,12 @@ export function registerPageTools(server: McpServer): void {
     {
       title: "Create a page",
       description:
-        "Creates a page in ONE language with its core SEO fields. Attach body sections " +
-        "(heroes, cards, sliders…) afterwards. The slug is the bare leaf; the site composes " +
-        "the routable path from the brand's container template and any parent page. Add other " +
-        "languages with the translation tools. Requires login and a write-enabled brand.",
+        "Creates a page in ONE language with its core SEO fields. Pass `content` (HTML) plus " +
+        "`page_content: {enabled: true}` to create the page with its rich-text body in the " +
+        "same call. Attach body sections (heroes, cards, sliders…) afterwards. The slug is " +
+        "the bare leaf; the site composes the routable path from the brand's container " +
+        "template and any parent page. Add other languages with the translation tools. " +
+        "Requires login and a write-enabled brand.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int().describe("Language of this first translation. See list_languages."),
@@ -189,6 +339,11 @@ export function registerPageTools(server: McpServer): void {
           .max(255)
           .describe("Lowercase ASCII, hyphens only — the leaf slug, no container prefix."),
         excerpt: z.string().optional(),
+        content: z
+          .string()
+          .optional()
+          .describe("HTML body of the first translation, stored verbatim. Shown only when the page_content block is enabled."),
+        page_content: pageContentParam.optional(),
         meta_title: z.string().max(255).optional(),
         meta_description: z.string().max(255).optional(),
         focus_keyword: z.string().max(255).optional(),
@@ -222,6 +377,267 @@ export function registerPageTools(server: McpServer): void {
             "Add other languages with the translation tools (auto_translate for pages).",
             "Attach body sections (heroes, cards, …) with update_page.",
           ],
+        });
+      }),
+  );
+
+  server.registerTool(
+    "set_page_content",
+    {
+      title: "Write a page's rich-text body",
+      description:
+        "Writes the HTML body of a page in ONE language and, if you pass page_content, " +
+        "enables/positions the block that renders it. This is the write half of moving a " +
+        "page's cards into its rich-text body: build the HTML from get_page_cards, save it " +
+        "here per language, then detach the folded cards with update_page. The rest of the " +
+        "translation (title, slug, SEO) is read first and re-sent unchanged, so only the " +
+        "body moves. The language row must already exist. Requires login and a " +
+        "write-enabled brand.",
+      inputSchema: {
+        project: projectParam,
+        page_id: z.number().int(),
+        language_code: z.string().min(2).describe("Which language's body to write, e.g. 'en'."),
+        content: z
+          .string()
+          .describe("The body HTML, stored verbatim. Pass an empty string to clear it."),
+        page_content: pageContentParam
+          .optional()
+          .describe(
+            "Also set the block's layout in the same operation — {enabled:true, order, " +
+              "grid_columns}. Omit to leave the block as it is.",
+          ),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, page_id, language_code, content, page_content }) =>
+      guard(async () => {
+        const blocked = ensureWritable(project);
+        if (blocked) return fail(blocked);
+
+        const code = language_code.toLowerCase();
+        const languageId = (await resolveLanguageIds(project, [code])).get(code);
+        if (languageId === undefined) return fail(`'${code}' is not an active language.`);
+
+        const response = await get<Envelope<PageDetail>>(project, `/admin/pages/${page_id}`, {
+          language_id: languageId,
+        });
+        const existing = (response.data.translations ?? []).find(
+          (t) => t.language?.code?.toLowerCase() === code,
+        );
+        if (!existing) {
+          return fail(
+            `Page ${page_id} has no '${code}' translation yet. Create it first ` +
+              "(auto_translate, or save_translations with type 'page').",
+          );
+        }
+
+        await writePageContent(project, page_id, languageId, existing, content);
+
+        if (page_content) {
+          await put(project, `/admin/pages/${page_id}`, { page_content });
+        }
+
+        return ok({
+          project,
+          page_id,
+          language: code,
+          language_id: languageId,
+          content_chars: content.length,
+          replaced_chars: (existing.content ?? "").length,
+          ...(page_content ? { page_content } : {}),
+        });
+      }),
+  );
+
+  server.registerTool(
+    "fold_page_cards",
+    {
+      title: "Fold a page's cards into its rich-text body",
+      description:
+        "Moves a page's prose cards into its page_content block, one language at a time. " +
+        "The cards' HTML is copied byte for byte — each card becomes its heading plus its " +
+        "own description, in render order — so nothing is rewritten, paraphrased or " +
+        "translated. Widget cards (whatsapp, sliders, galleries, word clouds) are skipped " +
+        "and stay on the page. Start with dry_run to see what each language would get. " +
+        "Requires login and a write-enabled brand.",
+      inputSchema: {
+        project: projectParam,
+        page_id: z.number().int(),
+        card_ids: z
+          .array(z.number().int())
+          .optional()
+          .describe("Which cards to fold. Omit for every prose card on the page."),
+        language_codes: z
+          .array(z.string())
+          .optional()
+          .describe("Languages to write, e.g. ['en','de']. Omit for every language the page has."),
+        heading_level: z
+          .enum(["h2", "h3", "none"])
+          .default("h2")
+          .describe("Tag wrapped around each card's title. 'none' drops the titles."),
+        dry_run: z
+          .boolean()
+          .default(true)
+          .describe("Build and report without writing. Flip to false to actually save."),
+        overwrite: z
+          .boolean()
+          .default(false)
+          .describe("Required to replace a body that already has content in that language."),
+        detach_cards: z
+          .boolean()
+          .default(false)
+          .describe("Also remove the folded cards from the page (they are NOT deleted)."),
+        page_content: pageContentParam
+          .optional()
+          .describe("Block layout. Defaults to enabled at the first folded card's position."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({
+      project,
+      page_id,
+      card_ids,
+      language_codes,
+      heading_level,
+      dry_run,
+      overwrite,
+      detach_cards,
+      page_content,
+    }) =>
+      guard(async () => {
+        const blocked = ensureWritable(project);
+        if (blocked) return fail(blocked);
+
+        const attached = await fetchPageCards(project, page_id);
+        const wanted = card_ids ? new Set(card_ids) : null;
+        const folding = attached.filter(({ card }) =>
+          wanted ? wanted.has(card.id) : PROSE_CARD_TYPES.has(card.type ?? ""),
+        );
+        if (folding.length === 0) {
+          return fail(
+            `No cards to fold on page ${page_id}. Attached: ` +
+              (attached.map(({ card }) => `${card.id} (${card.type})`).join(", ") || "none") +
+              ". Prose types are: " + [...PROSE_CARD_TYPES].join(", ") + ".",
+          );
+        }
+        const foldingIds = new Set(folding.map(({ card }) => card.id));
+        const staying = attached.filter(({ card }) => !foldingIds.has(card.id));
+
+        const detail = await get<Envelope<PageDetail>>(project, `/admin/pages/${page_id}`);
+        const byCode = new Map(
+          (detail.data.translations ?? []).map((t) => [t.language.code.toLowerCase(), t]),
+        );
+        const codes = (language_codes ?? [...byCode.keys()]).map((code) => code.toLowerCase());
+        const languageIds = await resolveLanguageIds(project, codes);
+
+        // Defaults are re-applied here, not just in the schema: an omitted flag must
+        // mean "preview, keep everything" rather than an unannounced live write.
+        const headingTag = heading_level === "none" ? null : (heading_level ?? "h2");
+        const preview = dry_run !== false;
+        const results: Record<string, unknown>[] = [];
+        let wrote = 0;
+
+        for (const code of codes) {
+          const translation = byCode.get(code);
+          if (!translation) {
+            results.push({ language: code, skipped: "the page has no translation in this language" });
+            continue;
+          }
+
+          const blocks: string[] = [];
+          const missing: number[] = [];
+          for (const { card } of folding) {
+            const text = cardText(card, code);
+            if (!text) {
+              missing.push(card.id);
+              continue;
+            }
+            const html = cardToHtml(card, text, headingTag, code);
+            if (html) blocks.push(html);
+          }
+
+          if (blocks.length === 0) {
+            results.push({
+              language: code,
+              skipped: "none of the folded cards have text in this language",
+              cards_missing_language: missing,
+            });
+            continue;
+          }
+
+          const content = blocks.join("\n\n");
+          const had = (translation.content ?? "").length;
+          if (had > 0 && overwrite !== true) {
+            results.push({
+              language: code,
+              skipped: `the body already has ${had} characters — pass overwrite:true to replace it`,
+              would_write_chars: content.length,
+            });
+            continue;
+          }
+
+          if (preview) {
+            results.push({
+              language: code,
+              would_write_chars: content.length,
+              replaces_chars: had,
+              cards: blocks.length,
+              ...(missing.length ? { cards_missing_language: missing } : {}),
+              preview: content.slice(0, 600),
+            });
+            continue;
+          }
+
+          await writePageContent(project, page_id, languageIds.get(code)!, translation, content);
+          wrote += 1;
+          results.push({
+            language: code,
+            written_chars: content.length,
+            replaced_chars: had,
+            cards: blocks.length,
+            ...(missing.length ? { cards_missing_language: missing } : {}),
+          });
+        }
+
+        // Layout and the card list only change once the text is actually in.
+        const block =
+          page_content ??
+          ({
+            enabled: true,
+            order: folding[0]?.slot.order ?? 0,
+            grid_columns: 12,
+          } as const);
+        if (!preview && wrote > 0) {
+          const body: Record<string, unknown> = { page_content: block };
+          if (detach_cards === true) {
+            body.cards = staying.map(({ slot }) => ({
+              id: slot.id,
+              ...(slot.order == null ? {} : { order: slot.order }),
+              ...(slot.grid_columns == null ? {} : { grid_columns: slot.grid_columns }),
+            }));
+          }
+          await put(project, `/admin/pages/${page_id}`, body);
+        }
+
+        return ok({
+          project,
+          page_id,
+          dry_run: preview,
+          folded_cards: folding.map(({ card, slot }) => ({
+            id: card.id,
+            type: card.type,
+            order: slot.order ?? 0,
+            title: cardText(card, codes[0] ?? "")?.title ?? null,
+          })),
+          kept_cards: staying.map(({ card }) => ({ id: card.id, type: card.type })),
+          page_content: preview ? { would_set: block } : block,
+          cards_detached: !preview && wrote > 0 && detach_cards === true,
+          languages: results,
+          note: preview
+            ? "Nothing was written. Re-run with dry_run:false to save."
+            : detach_cards === true
+              ? "The folded cards were removed from the page but still exist in the card library — delete_card removes them for good."
+              : "The folded cards are still attached, so the page now renders this text twice. update_page({cards:[…]}) drops them.",
         });
       }),
   );
@@ -262,18 +678,7 @@ export function registerPageTools(server: McpServer): void {
         sliders: orderedItems.optional(),
         contact_forms: orderedItems.optional(),
         multi_page_forms: orderedItems.optional(),
-        page_content: z
-          .object({
-            enabled: z.boolean(),
-            order: z.number().int().min(0).optional(),
-            grid_columns: z.number().int().min(1).max(12).optional(),
-          })
-          .optional()
-          .describe(
-            "The page's rich-text body block — layout only (enabled/order/grid_columns). " +
-              "The text itself is per language: write it to the `content` field via " +
-              "save_translations with type 'page'.",
-          ),
+        page_content: pageContentParam.optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },

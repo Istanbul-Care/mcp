@@ -24,6 +24,7 @@ import { registerHeaderTools } from "./tools/header.js";
 import { registerComponentTools } from "./tools/components.js";
 import { registerTranslatePrompt } from "./prompts/translate-brand.js";
 import { registerLoginPrompt } from "./prompts/login.js";
+import { registerCardsToPageContentPrompt } from "./prompts/cards-to-page-content.js";
 
 const server = new McpServer(
   { name: "istanbul-care-content", version: "0.1.0" },
@@ -62,6 +63,7 @@ registerHeaderTools(server);
 registerComponentTools(server);
 registerTranslatePrompt(server);
 registerLoginPrompt(server);
+registerCardsToPageContentPrompt(server);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
