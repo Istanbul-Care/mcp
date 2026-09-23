@@ -50,8 +50,11 @@ login({ project: "istanbul-care" })      → mails a code, returns the challenge
 submit_otp({ project: "istanbul-care", otp_code: "123456" })
 ```
 
-The resulting JWT is held **in this process's memory only**, never written to
-disk, and expires on its own. `auth_status` shows what is live; `logout` drops it.
+The resulting JWT is cached at `~/.ic-content-mcp/sessions.json` (0600, in a
+0700 directory) so a server restart does not force a fresh code out of the
+editor's inbox. It expires on its own. Set `ICMCP_PERSIST_SESSIONS=0` to keep
+tokens in memory only, or point `ICMCP_SESSION_FILE` elsewhere. `auth_status`
+shows what is live; `logout` drops it.
 
 Each brand is logged into separately — a token for IC does not work against AHC.
 
@@ -60,6 +63,8 @@ Each brand is logged into separately — a token for IC does not work against AH
 | Tool | Auth | What it does |
 |---|---|---|
 | `list_projects` | – | Brands, API hosts, public URLs, default locale |
+| `get_link_conventions` | – | Reserved link values, and which fields honour them |
+| `get_vocabularies` | – | Every field where only a listed value renders |
 | `list_languages` | – | Active languages + the ids translations key off |
 | `search_content` | – | Published posts/services/pages by title and slug |
 | `resolve_internal_link` | – | A slug/path/URL → its SEO-correct URL in one language |
@@ -207,13 +212,32 @@ npm run build && npm run check:translatable
 diffs it against the live API's OpenAPI spec (`../ICFrontend/api.yml` by default;
 pass another path as an argument) and fails on drift. Surfaces left out on
 purpose are recorded in `UNCOVERED` with the reason, so "not covered" is a
-decision rather than an oversight. Today that is one entry: media alt text.
+decision rather than an oversight. Today that is one entry: the footer, which
+is a nested tree and has its own `footer_worklist` / `save_footer` pair
+instead.
 
-## Not covered (by design, this iteration)
+## Conventions the server enforces
 
-- **Media upload.** `create_post_draft` accepts a `featured_image_id`, but there is no
-  tool to upload an image and mint that id — a post needing a *new* image still has to
-  get it into the media library another way. Deferred deliberately.
+Some values an editor types are read by the site as instructions rather than
+content, and nothing validates them — not the panel, not the API, not the
+column. A near miss renders a 404, or a modal that never opens, with no error
+anywhere. Two tools carry the rules:
+
+- `get_link_conventions` — the reserved link values: `cta_url`, the
+  `modal-dialog-` prefix (whose whole value doubles as the form's `form_code`),
+  the rich-text lead anchors, and the WhatsApp hosts that gate a lead form.
+  It also names the fields where these do **not** work: the header menu and
+  the top footer sections render through a plain link, so the same string that
+  opens a modal on a card button 404s in the navigation.
+- `get_vocabularies` — every field where only a listed value renders: card and
+  hero styles, menu item types, link icons, media types, form field types. The
+  write tools reject a value the site cannot use, including two the admin panel
+  offers but the site never renders (`coverflow`, `media_slider`).
+
+Parsed text columns are checked too: a word-cloud card's JSON badges, the
+pipe-separated focus keyword, ISO-4217 currencies, bare video ids for
+`youtube.*` / `tiktok.*` media, and structured data carrying its own
+`@context`.
 
 ## Why `resolve_internal_link` exists
 
