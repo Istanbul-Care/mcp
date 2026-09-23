@@ -91,6 +91,18 @@ Each brand is logged into separately — a token for IC does not work against AH
 | `fold_page_cards` | ✓* | Move a page's prose cards into its `page_content` body, byte for byte (previews by default) |
 | `set_page_content` | ✓* | Write a page's body HTML for one language + enable/position the `page_content` block |
 | `get_card` / `get_page_cards` | ✓ | One card in full / a page's cards in render order, with their text and images |
+| `get_component` | ✓ | One hero/slider/package/footer/form in full, with every child id |
+| `update_hero` / `update_slider` / `update_process` / `update_price_compare` / `update_promotional_landing` / `update_before_after` | ✓* | Edit a component after it exists |
+| `create_hero_feature` / `create_slide` / `create_slide_feature` / `create_process_step` / `create_price_compare_country` / `create_promo_feature` / `create_gallery_item` | ✓* | Add one child row (each with `update_*` and `delete_*`) |
+| `create_package_section` / `create_offer` | ✓* | Build a pricing table tier by tier (price and currency are per-language) |
+| `list_links` / `create_link` / `update_link` / `delete_link` | ✓* | The reusable CTA buttons other blocks point at |
+| `create_header` / `update_header` / `delete_header` | ✓* | The nav shell the menu items hang off |
+| `list_footers` / `create_footer` / `create_footer_translation` / `create_footer_section` / `create_footer_item` | ✓* | A footer, then its columns **per language** |
+| `update_multi_page_form` / `create_form_page` / `create_form_field` / `create_form_option` | ✓* | The consultation wizard's steps, inputs and choices (steps are per-language) |
+| `list_form_submissions` | ✓ | The leads a form has collected |
+| `deactivate_*` / `restore_*` / `delete_*` (post, page, service) | ✓* | Reversible takedown, undo, and permanent removal |
+| `update_service` / `publish_service` / `unpublish_service` | ✓* | What posts already had, for services |
+| `bulk_update_posts` / `bulk_update_pages` / `bulk_update_services` | ✓* | Status and robots flags across a list of ids |
 
 `✓` needs login. `✓*` also needs the brand in `ICMCP_WRITE_PROJECTS` (write gate).
 
@@ -238,6 +250,17 @@ Parsed text columns are checked too: a word-cloud card's JSON badges, the
 pipe-separated focus keyword, ISO-4217 currencies, bare video ids for
 `youtube.*` / `tiktok.*` media, and structured data carrying its own
 `@context`.
+
+Three structural conventions are documented in `get_writing_guide` because no
+validator can catch them:
+
+- **A footer's columns and a form's steps hang off a *translation*, not off the
+  footer or the form.** Adding a column in English adds nothing to Italian.
+- **A package tier's price and currency are translated fields.** A price set in
+  one language is not the price shown in another.
+- **A slider with no `style` guesses from its slides** — and in the mixed case
+  it collects the timeline half by looking for slide type `image`, so real
+  `timeline` slides vanish.
 
 ## Why `resolve_internal_link` exists
 

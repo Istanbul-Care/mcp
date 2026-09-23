@@ -96,6 +96,36 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
     note: "Capitalised — the only style field on the site that is not lowercase.",
   },
 
+  slide_type: {
+    field: "type",
+    applies_to: "slider slide",
+    values: [
+      { value: "timeline", label: "Timeline step" },
+      { value: "showcase", label: "Showcase panel" },
+      { value: "image", label: "Plain image slide", note: "Rendered by the timeline layout." },
+    ],
+    on_unknown:
+      "The slide belongs to neither layout and is dropped from the mixed-slide fallback.",
+    note:
+      "Always set the slider's own style as well. With no style the site guesses from the " +
+      "slides, and in the mixed case it collects the timeline half by looking for type " +
+      "'image' — so a styleless slider holding 'timeline' and 'showcase' slides renders the " +
+      "showcase ones and silently drops every timeline slide.",
+  },
+
+  footer_section_platform: {
+    field: "platform",
+    applies_to: "footer_section",
+    values: [
+      { value: "instagram" },
+      { value: "facebook" },
+      { value: "youtube" },
+      { value: "messenger" },
+    ],
+    on_unknown: "Rejected by the API.",
+    note: "Only set on the social sections; leave it empty for an ordinary link column.",
+  },
+
   before_after_style: {
     field: "style",
     applies_to: "before_after",

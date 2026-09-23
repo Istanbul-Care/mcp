@@ -87,6 +87,33 @@ the write tools reject a value the site cannot render.
 - The form page titled exactly \`name\` supplies the lead's name.
 - Only the first process and the first contact form on a page render.
 
+**Structure that is per-language, not per-brand.** Two collections hang off a
+*translation* rather than off the row everyone thinks owns them:
+- A footer's **sections** belong to a footer translation. The Italian footer's
+  columns are separate rows from the English ones, so adding a link column in
+  English adds nothing to any other language.
+- A multi-step form's **pages** belong to a form translation. A step added in
+  one language leaves the others with a shorter form and no warning.
+Read the parent with get_component first and use the translation id from it.
+
+**Prices live on the translation.** A package tier's \`price\` and \`currency\`
+are translated fields. Setting a price in English does not set it in Italian —
+that language keeps whatever it had, or shows nothing.
+
+**A slider needs its own style.** With no style set, the site guesses from the
+slides, and in the mixed case it gathers the timeline half by looking for slide
+type \`image\`. A styleless slider holding real \`timeline\` slides next to
+\`showcase\` ones renders the showcase slides and silently drops the rest.
+
+**Two-step children.** A process step is created with only a number and a
+position; without a following step translation it renders blank. The same is
+true of any child whose create call takes no \`translation\`.
+
+**Deactivate, don't delete.** \`deactivate_*\` is reversible and keeps every
+translation; \`delete_*\` is not. If the URL had traffic, pair the takedown with
+create_redirect — and if the page is only temporarily wrong, leave it up and
+turn robots_index off with the bulk tools instead.
+
 **Layout side effects.** Enabling page content, a blog layout, or adding a card
 of type \`content\` removes the page's standalone contact form, because those
 layouts render the form themselves.

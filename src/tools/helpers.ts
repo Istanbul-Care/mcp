@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { checkVocabulary } from "../lib/vocabularies.js";
 import { PROJECT_IDS, isProjectId, type ProjectId } from "../config/projects.js";
-import { get } from "../api/client.js";
+import { get, post as apiPost, put as apiPut, del as apiDel } from "../api/client.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Envelope, LanguageListData, LanguageListItem } from "../api/types.js";
 
 export const projectParam = z
@@ -124,4 +125,105 @@ export function ensureVocabulary(
     if (!result.ok) return result.message ?? `Invalid value for ${name}.`;
   }
   return null;
+}
+
+/* ------------------------------------------------------------------ *
+ * One primitive for every structural write.
+ *
+ * The admin API is a wide but very regular surface: each component has a
+ * parent row, a handful of child collections, and per-language translations,
+ * all reached by POST/PUT/DELETE on a predictable path. Writing each of those
+ * out by hand is how tools drift apart — one forgets the write gate, another
+ * forgets to validate a dropdown value, a third returns a different shape.
+ * Everything structural goes through `registerWrite` instead, so the gate,
+ * the validation hook and the response shape are written once.
+ * ------------------------------------------------------------------ */
+
+export type WriteArgs = Record<string, any>;
+
+/** What the API returns from a create: most nest the row, a few don't. */
+interface CreatedRow {
+  id?: number;
+  data?: { id?: number };
+}
+
+export interface WriteSpec {
+  /** Tool name, e.g. "create_hero_feature". */
+  name: string;
+  title: string;
+  description: string;
+  /** Zod shape WITHOUT `project` — it is added for you. */
+  params?: Record<string, z.ZodTypeAny>;
+  method: "post" | "put" | "delete";
+  /** Build the request path from the call's arguments. */
+  path: (args: WriteArgs) => string;
+  /** Build the request body. Keys whose value is undefined are dropped. */
+  body?: (args: WriteArgs) => unknown;
+  /**
+   * Reject a value the site cannot render, before it reaches the database.
+   * Return an error message, or null when the arguments are fine.
+   */
+  checks?: (args: WriteArgs) => string | null;
+  /** Adds the destructive annotation and names the id in the result. */
+  destructive?: boolean;
+  /** Extra keys to echo back so the caller can chain the next call. */
+  echo?: string[];
+}
+
+/** Drop undefined keys so a PUT never blanks a field the caller left out. */
+export function pruned(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+export function registerWrite(server: McpServer, spec: WriteSpec): void {
+  server.registerTool(
+    spec.name,
+    {
+      title: spec.title,
+      description: `${spec.description} Requires login and a write-enabled brand.`,
+      inputSchema: { project: projectParam, ...(spec.params ?? {}) },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: spec.destructive === true,
+        openWorldHint: true,
+      },
+    },
+    async (args: WriteArgs) =>
+      guard(async () => {
+        const project = args.project as ProjectId;
+        const blocked = ensureWritable(project);
+        if (blocked) return fail(blocked);
+        const invalid = spec.checks?.(args);
+        if (invalid) return fail(invalid);
+
+        const path = spec.path(args);
+        const body = spec.body ? pruned(spec.body(args) as Record<string, unknown>) : undefined;
+
+        if (spec.method === "delete") {
+          await apiDel(project, path);
+          return ok({ project, deleted: true, ...echoed(args, spec.echo) });
+        }
+        if (spec.method === "put") {
+          await apiPut(project, path, body ?? {});
+          return ok({ project, updated: true, ...echoed(args, spec.echo) });
+        }
+        const created = await apiPost<CreatedRow>(project, path, body ?? {});
+        return ok({
+          project,
+          created: true,
+          id: created.data?.id ?? created.id,
+          ...echoed(args, spec.echo),
+        });
+      }),
+  );
+}
+
+function echoed(args: WriteArgs, keys?: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of keys ?? []) if (args[key] !== undefined) out[key] = args[key];
+  return out;
 }

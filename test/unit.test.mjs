@@ -27,6 +27,7 @@ import {
   ANCHOR_RE,
 } from "../dist/lib/links.js";
 import { checkVocabulary, VOCABULARIES } from "../dist/lib/vocabularies.js";
+import { pruned } from "../dist/tools/helpers.js";
 import {
   checkWordCloudDescription,
   checkFocusKeyword,
@@ -323,4 +324,37 @@ test("checkSchemaData: structured data must carry its context", () => {
   );
   // An empty block means "no schema", not a broken one.
   assert.equal(checkSchemaData({}).ok, true);
+});
+
+test("slide type: the three the site branches on", () => {
+  for (const type of ["timeline", "showcase", "image"]) {
+    assert.equal(checkVocabulary("slide_type", type).ok, true);
+  }
+  assert.equal(checkVocabulary("slide_type", "carousel").ok, false);
+});
+
+test("slide type: the vocabulary warns about the styleless mixed slider", () => {
+  // The site's fallback collects the timeline half by looking for type
+  // 'image', so a styleless slider holding real 'timeline' slides loses them.
+  // Anyone reading this vocabulary has to be told that, not just the values.
+  assert.match(VOCABULARIES.slide_type.note, /drops every timeline slide/);
+});
+
+test("footer platform: only the four the API accepts", () => {
+  assert.equal(checkVocabulary("footer_section_platform", "instagram").ok, true);
+  assert.equal(checkVocabulary("footer_section_platform", "twitter").ok, false);
+});
+
+test("pruned: a field the caller left out is not sent", () => {
+  // Every structural update builds its body by naming all the optional
+  // fields. Without this, a PUT that changes an icon would blank the label.
+  assert.deepEqual(pruned({ label: "Call us", url: undefined, order: 0 }), {
+    label: "Call us",
+    order: 0,
+  });
+});
+
+test("pruned: an explicit null still goes through", () => {
+  // Clearing a field is a real intent, and distinct from omitting it.
+  assert.deepEqual(pruned({ logo_id: null }), { logo_id: null });
 });
