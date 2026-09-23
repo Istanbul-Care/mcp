@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { get, post, put, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
 import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { checkSchemaData, ensureFormats } from "../lib/field-formats.js";
 
 interface SeoSchemaListData {
   seo_schemas?: Array<Record<string, unknown>>;
@@ -108,6 +109,8 @@ export function registerSeoTools(server: McpServer): void {
       guard(async () => {
         const blocked = ensureWritable(project);
         if (blocked) return fail(blocked);
+        const badFormat = ensureFormats([checkSchemaData(schema_data)]);
+        if (badFormat) return fail(badFormat);
         const response = await post<Envelope<CreatedSchema>>(
           project,
           "/admin/seo-schemas",
@@ -161,6 +164,8 @@ export function registerSeoTools(server: McpServer): void {
       guard(async () => {
         const blocked = ensureWritable(project);
         if (blocked) return fail(blocked);
+        const badFormat = ensureFormats([checkSchemaData(body.schema_data)]);
+        if (badFormat) return fail(badFormat);
         const response = await post<Envelope<CreatedSchema>>(
           project,
           "/admin/seo-schemas",
@@ -244,6 +249,8 @@ export function registerSeoTools(server: McpServer): void {
       guard(async () => {
         const blocked = ensureWritable(project);
         if (blocked) return fail(blocked);
+        const badFormat = ensureFormats([checkSchemaData(body.schema_data)]);
+        if (badFormat) return fail(badFormat);
         await put(project, `/admin/seo-schemas/${schema_id}`, body);
         return ok({ project, schema_id, updated: true });
       }),

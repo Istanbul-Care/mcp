@@ -27,6 +27,14 @@ import {
   ANCHOR_RE,
 } from "../dist/lib/links.js";
 import { checkVocabulary, VOCABULARIES } from "../dist/lib/vocabularies.js";
+import {
+  checkWordCloudDescription,
+  checkFocusKeyword,
+  checkCurrency,
+  checkEmbedId,
+  checkQueryParameters,
+  checkSchemaData,
+} from "../dist/lib/field-formats.js";
 
 test("slugify: lowercases, hyphenates, strips accents", () => {
   assert.equal(slugify("Hello World"), "hello-world");
@@ -263,4 +271,56 @@ test("every vocabulary states what happens on an unknown value", () => {
     assert.ok(vocab.on_unknown, `${name} does not say what an unknown value does`);
     assert.ok(vocab.applies_to, `${name} does not say what it applies to`);
   }
+});
+
+// --- Parsed text columns --------------------------------------------------
+// These columns look like free text everywhere but the site runs a parser over
+// them and swallows the error, so a malformed value renders as nothing.
+
+test("checkWordCloudDescription: rejects HTML where JSON is required", () => {
+  assert.equal(checkWordCloudDescription("<p>Why choose us</p>").ok, false);
+});
+
+test("checkWordCloudDescription: accepts the badge array the site expects", () => {
+  const badges = JSON.stringify([{ title: "Experience", description: "15 years" }]);
+  assert.equal(checkWordCloudDescription(badges).ok, true);
+});
+
+test("checkWordCloudDescription: rejects entries with no title", () => {
+  assert.equal(checkWordCloudDescription(JSON.stringify([{ description: "x" }])).ok, false);
+});
+
+test("checkFocusKeyword: the site splits on '|', not ','", () => {
+  assert.equal(checkFocusKeyword("hair transplant|fue").ok, true);
+  assert.equal(checkFocusKeyword("hair transplant").ok, true);
+  assert.equal(checkFocusKeyword("hair transplant, fue, turkey").ok, false);
+});
+
+test("checkCurrency: only an ISO-4217 code renders a symbol", () => {
+  assert.equal(checkCurrency("USD").ok, true);
+  assert.equal(checkCurrency("€").ok, false);
+  assert.equal(checkCurrency("Euro").ok, false);
+  assert.equal(checkCurrency("usd ").ok, false);
+});
+
+test("checkEmbedId: a dotted media type stores the bare video id", () => {
+  assert.equal(checkEmbedId("youtube.short", "https://youtube.com/shorts/abc").ok, false);
+  assert.equal(checkEmbedId("youtube.short", "abc").ok, true);
+  // An ordinary video is a real URL and must not be flagged.
+  assert.equal(checkEmbedId("video", "https://cdn.example/clip.mp4").ok, true);
+});
+
+test("checkQueryParameters: flags keys the site always overwrites", () => {
+  assert.equal(checkQueryParameters("category_id=3").ok, true);
+  assert.equal(checkQueryParameters("category_id=3&limit=5").ok, false);
+});
+
+test("checkSchemaData: structured data must carry its context", () => {
+  assert.equal(checkSchemaData({ "@type": "Service" }).ok, false);
+  assert.equal(
+    checkSchemaData({ "@context": "https://schema.org", "@type": "Service" }).ok,
+    true,
+  );
+  // An empty block means "no schema", not a broken one.
+  assert.equal(checkSchemaData({}).ok, true);
 });

@@ -271,12 +271,26 @@ test("create_seo_schema: POST with a raw JSON-LD object", async () => {
   await call("create_seo_schema", {
     project: PROJECT,
     content_type: "service",
-    schema_data: { "@type": "Service" },
+    // The site emits schema_data verbatim, so it has to be complete JSON-LD.
+    schema_data: { "@context": "https://schema.org", "@type": "Service" },
     is_default: true,
   });
   assert.equal(lastCall().method, "POST");
   assert.ok(lastCall().url.endsWith("/admin/seo-schemas"));
   assert.equal(lastBody().is_default, true);
+});
+
+test("create_seo_schema: refuses JSON-LD with no @context", async () => {
+  const before = lastCall();
+  const result = await call("create_seo_schema", {
+    project: PROJECT,
+    content_type: "service",
+    schema_data: { "@type": "Service" },
+  });
+  // Nothing is sent: an incomplete block would be emitted into the page as-is
+  // and silently ignored by search engines.
+  assert.equal(lastCall(), before);
+  assert.match(JSON.stringify(result), /@context/);
 });
 
 test("delete_seo_schema: DELETE /admin/seo-schemas/{id}", async () => {

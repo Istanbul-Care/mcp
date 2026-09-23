@@ -16,7 +16,8 @@ import type { Envelope, LanguageInfo } from "../api/types.js";
 import { coerceSlug } from "../lib/slug.js";
 import type { ProjectId } from "../config/projects.js";
 import { fetchPageCards, type CardDetail, type CardTranslationDetail } from "./cards.js";
-import { ok, fail, guard, projectParam, ensureWritable, resolveLanguageIds } from "./helpers.js";
+import { ok, fail, guard, projectParam, ensureWritable, ensureVocabulary, resolveLanguageIds } from "./helpers.js";
+import { checkQueryParameters, ensureFormats } from "../lib/field-formats.js";
 
 interface PageTranslation {
   language: LanguageInfo;
@@ -86,6 +87,26 @@ const SECTION_KEYS = [
   "google_map_sections",
 ] as const;
 type SectionKey = (typeof SECTION_KEYS)[number];
+
+/**
+ * Built-in blocks switched on rather than attached by id. Read back with the
+ * attached sections so a caller can see the whole page before changing it —
+ * their `order` competes in the same sequence as the attached ones.
+ */
+const FLAG_KEYS = [
+  "page_content",
+  "page_faq",
+  "blogs",
+  "services",
+  "social_media",
+  "reviews",
+  "sticky_multi_form",
+  "single_blog_content",
+  "single_service_content",
+  "before_after_ai",
+  "graftCalculator",
+  "child_pages",
+] as const;
 
 type PageSections = Partial<Record<SectionKey, OrderedItem[]>>;
 
@@ -198,6 +219,66 @@ const pageContentParam = z
       "it to the `content` field via save_translations with type 'page'.",
   );
 
+/**
+ * A page's "feature flag" blocks: built-in sections that are switched on
+ * rather than attached by id. They share the layout shape of a section, and
+ * their `order` competes in the SAME sequence as the attached sections — a
+ * flag at order 3 renders between two cards at 2 and 4.
+ */
+const featureFlagParam = z.object({
+  enabled: z.boolean(),
+  order: z.number().int().min(0).optional(),
+  grid_columns: z.number().int().min(1).max(12).optional(),
+});
+
+const blogsFlagParam = featureFlagParam
+  .extend({
+    author_id: z.number().int().nullable().optional(),
+    limit: z.number().int().min(1).optional(),
+    query_parameters: z
+      .string()
+      .optional()
+      .describe(
+        "A raw query string such as 'category_id=3&sort_by=published_at' — no leading '?' " +
+          "needed. `page` and `limit` in it are always overwritten, so setting them has no " +
+          "effect. A malformed value does not error; the list simply comes back unfiltered.",
+      ),
+  })
+  .describe("The blog listing block.");
+
+const reviewsFlagParam = featureFlagParam
+  .extend({
+    average_rating: z.number().min(0).max(5).optional(),
+    total_reviews_text: z.string().max(128).optional(),
+    years_experience_text: z.string().max(128).optional(),
+  })
+  .describe("The reviews block.");
+
+const stickyFormFlagParam = featureFlagParam
+  .extend({
+    form_code: z
+      .string()
+      .max(255)
+      .optional()
+      .describe("The multi-page form's own code. Takes precedence over a sticky contact form."),
+    form_id: z.number().int().nullable().optional().describe("A contact form id instead."),
+  })
+  .describe(
+    "The sticky bottom button. form_code and form_id are mutually exclusive; form_code wins.",
+  );
+
+const pageFaqFlagParam = featureFlagParam
+  .extend({
+    style: z
+      .string()
+      .optional()
+      .describe("default_faq or word_style_faq. Checked against the values the site renders."),
+  })
+  .describe(
+    "The FAQ block. When the page also has single_blog_content enabled it silently renders " +
+      "as a bare accordion instead of the searchable FAQ.",
+  );
+
 export function registerPageTools(server: McpServer): void {
   server.registerTool(
     "list_pages",
@@ -270,6 +351,12 @@ export function registerPageTools(server: McpServer): void {
           featured_image_id: pageDetail.featured_image_id,
           page_content: pageDetail.page_content ?? null,
           sections,
+          feature_blocks: Object.fromEntries(
+            FLAG_KEYS.map((key) => [key, (pageDetail as unknown as Record<string, unknown>)[key] ?? null]).filter(
+              ([, value]) => value !== null && value !== undefined,
+            ),
+          ),
+          data_source_type: (pageDetail as unknown as Record<string, unknown>).data_source_type ?? null,
           translations: pageDetail.translations.map((t) => ({
             language: t.language.code,
             language_id: t.language.id,
@@ -701,6 +788,39 @@ export function registerPageTools(server: McpServer): void {
           .optional()
           .describe("Grid columns are ignored for map sections; they always span full width."),
         page_content: pageContentParam.optional(),
+        // Built-in blocks, switched on rather than attached by id.
+        blogs: blogsFlagParam.optional(),
+        services: featureFlagParam.optional(),
+        social_media: featureFlagParam.optional(),
+        reviews: reviewsFlagParam.optional(),
+        page_faq: pageFaqFlagParam.optional(),
+        sticky_multi_form: stickyFormFlagParam.optional(),
+        single_blog_content: featureFlagParam
+          .optional()
+          .describe(
+            "Marks this as a single-blog page. Turning it on removes the standalone contact " +
+              "form, because this layout renders the form in its own sidebar.",
+          ),
+        single_service_content: featureFlagParam
+          .optional()
+          .describe("Marks this as a single-service page."),
+        before_after_ai: featureFlagParam.optional(),
+        graft_calculator: featureFlagParam
+          .optional()
+          .describe("Sent to the API as `graftCalculator` — the one camelCase key in this payload."),
+        child_pages: z
+          .object({
+            show_child_pages: z.boolean(),
+            order: z.number().int().min(0).optional(),
+            grid_columns: z.number().int().min(1).max(12).optional(),
+          })
+          .optional()
+          .describe("Uses show_child_pages, not enabled."),
+        data_source_type: z
+          .string()
+          .nullable()
+          .optional()
+          .describe("'blog_list' or 'service_list', or null to clear."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
@@ -708,12 +828,20 @@ export function registerPageTools(server: McpServer): void {
       guard(async () => {
         const blocked = ensureWritable(project);
         if (blocked) return fail(blocked);
-        await put(project, `/admin/pages/${page_id}`, body);
+        const badValue = ensureVocabulary([["faq_style", body.page_faq?.style]]);
+        if (badValue) return fail(badValue);
+        const badFormat = ensureFormats([checkQueryParameters(body.blogs?.query_parameters)]);
+        if (badFormat) return fail(badFormat);
+        // The API reads this one block under a camelCase alias.
+        const { graft_calculator, ...rest } = body;
+        const payload: Record<string, unknown> = { ...rest };
+        if (graft_calculator !== undefined) payload.graftCalculator = graft_calculator;
+        await put(project, `/admin/pages/${page_id}`, payload);
         return ok({
           project,
           page_id,
           updated: true,
-          changed: Object.keys(body).filter((k) => body[k as keyof typeof body] !== undefined),
+          changed: Object.keys(payload).filter((k) => payload[k] !== undefined),
         });
       }),
   );

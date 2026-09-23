@@ -28,7 +28,14 @@ const translationFields = {
   content: z.string().min(1).describe("Post body as HTML."),
   meta_title: z.string().max(255).optional(),
   meta_description: z.string().max(255).optional(),
-  focus_keyword: z.string().max(255).optional(),
+  focus_keyword: z
+    .string()
+    .max(255)
+    .optional()
+    .describe(
+      "One keyword, or several separated by '|'. The site splits on the pipe — a " +
+        "comma-separated list is read as a single long keyword.",
+    ),
   canonical_url: z.string().max(255).optional(),
   robots_index: z.boolean().default(true),
   robots_follow: z.boolean().default(true),

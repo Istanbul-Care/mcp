@@ -170,7 +170,13 @@ export function registerMediaTools(server: McpServer): void {
       inputSchema: {
         project: projectParam,
         external_url: z.string().url().describe("The external URL, e.g. a YouTube link."),
-        media_type: z.enum(["video", "image"]).default("video"),
+        media_type: z
+          .enum(["video", "image"])
+          .default("video")
+          .describe(
+            "For a youtube.* or tiktok.* media the site stores the BARE video id, not the " +
+              "watch URL — it interpolates the value into the embed path.",
+          ),
         alt: z.string().optional().describe("Alt text / description in the default language."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
