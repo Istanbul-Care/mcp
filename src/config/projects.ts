@@ -54,7 +54,7 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     shortName: "RH",
     apiBaseUrl: "https://api.rh.istanbul-care.com/v1",
     mediaBaseUrl: "https://api.rh.istanbul-care.com",
-    frontendUrl: "https://main.d1m39bbqerebav.amplifyapp.com",
+    frontendUrl: "https://royalhairistanbul.com",
     defaultLanguage: "en",
   },
   "royal-hair-dominic": {
@@ -63,7 +63,7 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     shortName: "RHD",
     apiBaseUrl: "https://api.rh-dominic.istanbul-care.com/v1",
     mediaBaseUrl: "https://api.rh-dominic.istanbul-care.com",
-    frontendUrl: "https://main.d2dylfmvgck5cz.amplifyapp.com",
+    frontendUrl: "https://dominic.istanbul-care.com",
     defaultLanguage: "en",
   },
   "ic-dental-group": {
@@ -72,7 +72,7 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     shortName: "ICD",
     apiBaseUrl: "https://api.icd.istanbul-care.com/v1",
     mediaBaseUrl: "https://api.icd.istanbul-care.com",
-    frontendUrl: "https://main.dor6dgk9xyo3d.amplifyapp.com",
+    frontendUrl: "https://icdentalgroup.com",
     defaultLanguage: "en",
   },
   "luneste-clinic": {
@@ -81,7 +81,7 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     shortName: "LC",
     apiBaseUrl: "https://api.lc.istanbul-care.com/v1",
     mediaBaseUrl: "https://api.lc.istanbul-care.com",
-    frontendUrl: "https://main.d1qwnxq0gvbv65.amplifyapp.com",
+    frontendUrl: "https://lunesteclinic.com",
     defaultLanguage: "en",
   },
   "capelli-albanian": {
@@ -90,7 +90,7 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     shortName: "CA",
     apiBaseUrl: "https://api.ca.istanbul-care.com/v1",
     mediaBaseUrl: "https://api.ca.istanbul-care.com",
-    frontendUrl: "https://main.d3uorp0agsozpd.amplifyapp.com",
+    frontendUrl: "https://capellialbania.com",
     defaultLanguage: "en",
   },
   "emperial-hair-clinic": {
@@ -102,13 +102,16 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     frontendUrl: "https://main.d1scnz4wu2fqmb.amplifyapp.com",
     defaultLanguage: "en",
   },
+  // The shared test environment. Its API is live; the Amplify preview that
+  // used to serve its frontend is gone, so public-URL tools have nothing to
+  // point at here and read_public_page will not work against it.
   staging: {
     id: "staging",
     name: "Staging",
     shortName: "Staging",
     apiBaseUrl: "https://staging.istanbul-care.com/v1",
     mediaBaseUrl: "https://staging.istanbul-care.com",
-    frontendUrl: "https://staging.d3p75k79sxy2xd.amplifyapp.com",
+    frontendUrl: "https://staging.istanbul-care.com",
     defaultLanguage: "en",
   },
 };

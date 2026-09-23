@@ -14,6 +14,8 @@ import {
   type AuthedUser,
 } from "../auth/session.js";
 import { ok, fail, guard, projectParam } from "./helpers.js";
+import { startBrowserLogin } from "../auth/browser-login.js";
+import type { ProjectId } from "../config/projects.js";
 
 interface LoginChallengeResponse {
   status: "otp_required";
@@ -38,13 +40,78 @@ export function registerAuthTools(server: McpServer): void {
   server.registerTool(
     "login",
     {
-      title: "Start login (sends OTP)",
+      title: "Sign in",
       description:
-        "Step 1 of 2. Sends a one-time code to the account's e-mail for the given brand, " +
-        "and returns the challenge id. The backend requires OTP for every role, so there " +
-        "is no way to skip this. Follow up with submit_otp once the human reads the code. " +
-        "Credentials come from the ICMCP_EMAIL / ICMCP_PASSWORD environment variables " +
-        "unless passed explicitly.",
+        "Opens a sign-in page in the browser and returns its URL. Give that URL to the " +
+        "person and wait — they type their e-mail, password and the e-mailed code into the " +
+        "page, not into this chat, so no secret ever enters the conversation or its " +
+        "transcript. One sign-in covers EVERY brand their account exists on; the result " +
+        "lists which ones. Brands they have no account on are reported as such, and calls " +
+        "against those will say so rather than failing obscurely.",
+      inputSchema: {
+        project: projectParam
+          .optional()
+          .describe(
+            "Which brand to verify the password against. Any brand the person has an " +
+              "account on works — the token covers the rest. Defaults to istanbul-care.",
+          ),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project }) =>
+      guard(async () => {
+        const anchor = (project ?? "istanbul-care") as ProjectId;
+        const flow = await startBrowserLogin(anchor);
+
+        // Wait for the browser, but not forever: hand the URL back quickly if
+        // the person has not finished, so the agent can show it rather than
+        // sitting silent on a tool call.
+        const outcome = await Promise.race([
+          flow.done.then((result) => ({ kind: "done" as const, result })),
+          new Promise<{ kind: "waiting" }>((resolve) =>
+            setTimeout(() => resolve({ kind: "waiting" }), 120_000),
+          ),
+        ]).catch((error: unknown) => ({
+          kind: "failed" as const,
+          message: error instanceof Error ? error.message : String(error),
+        }));
+
+        if (outcome.kind === "waiting") {
+          return ok({
+            open_this_url: flow.url,
+            status: "waiting for the browser",
+            tell_the_user:
+              `Open ${flow.url} and sign in there. Do not type your password or the code ` +
+              `here. Call auth_status when you are done.`,
+          });
+        }
+        if (outcome.kind === "failed") return fail(outcome.message);
+
+        const allowed = outcome.result.access.filter((a) => a.allowed).map((a) => a.project);
+        const denied = outcome.result.access.filter((a) => !a.allowed).map((a) => a.project);
+        return ok({
+          signed_in_as: outcome.result.user.email,
+          brands_you_can_work_on: allowed,
+          brands_without_an_account: denied,
+          note:
+            denied.length > 0
+              ? "Those brands have no user with this e-mail. An admin has to add one; " +
+                "nothing here can grant it."
+              : "Every brand accepted this account.",
+        });
+      }),
+  );
+
+  server.registerTool(
+    "login_with_password",
+    {
+      title: "Start login from stored credentials (fallback)",
+      description:
+        "The headless fallback for when a browser is not available — a CI job, a server " +
+        "with no display. Prefer `login`, which opens a sign-in page so no password or " +
+        "one-time code ever passes through this conversation. Credentials come from the " +
+        "ICMCP_EMAIL / ICMCP_PASSWORD environment variables unless passed explicitly; " +
+        "follow up with submit_otp.",
       inputSchema: {
         project: projectParam,
         email: z.string().email().optional().describe("Overrides the env credential."),

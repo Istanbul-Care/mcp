@@ -18,80 +18,65 @@ touched.
 
 ## Install
 
-```bash
-npm install
-npm run build
+One line, wherever Claude runs:
+
+```
+claude mcp add ic-content -s user -- npx -y github:Istanbul-Care/mcp
 ```
 
-## Register with Claude Code
+That is the whole setup. No clone, no build step, no credentials in the
+command — npx fetches the repo, builds it, and runs it.
+
+For Claude Desktop, the same thing as a config entry:
 
 ```json
 {
   "mcpServers": {
-    "ic-content": {
-      "command": "node",
-      "args": ["D:/Repos/icare/mcp/dist/index.js"],
-      "env": {
-        "ICMCP_EMAIL": "you@istanbul-care.com",
-        "ICMCP_PASSWORD": "…"
-      }
-    }
+    "ic-content": { "command": "npx", "args": ["-y", "github:Istanbul-Care/mcp"] }
   }
 }
 ```
 
-Copy `.env.example` for the full list of environment variables.
+Working on the server itself? Clone it and point at `dist/index.js` instead;
+`npm install` builds on its own.
 
-## Setting it up for someone who writes content
+## Signing in
 
-The server runs locally, so each person needs their own copy registered with
-whichever Claude app they use. `npm run setup` writes that entry for them —
-merging into the config, never replacing what is already there:
+Ask Claude to sign you in. It calls `login`, which starts a sign-in page on
+127.0.0.1 and hands back the URL; you open it, type your e-mail, password and
+the one-time code from your inbox **into that page**, and close the tab.
 
-```
-git clone git@github.com:Istanbul-Care/mcp.git && cd mcp
-npm install                      # builds on install
-npm run setup -- --email you@istanbul-care.com --brands istanbul-care
-```
+Nothing you type there passes through the conversation, so no password or code
+is ever written into a chat transcript.
 
-It asks for the password, stores it only in the app's own config file and locks
-that file to 0600, and prints the equivalent `claude mcp add` line for Claude
-Code. `--no-password` skips storing one; `--brands` is the write gate, and
-leaving it off means read-only.
+**One sign-in covers every brand.** The tenants share a JWT secret and the
+token carries your e-mail, which each tenant resolves against its own users
+table — so after signing in once, `login` reports exactly which brands accepted
+your account and which have no user with that address. Claude will tell you
+plainly when you ask it to touch a brand you have no account on; that needs an
+admin to add you, and no amount of retrying changes it.
 
-**Use a personal account, not a shared one.** Every request the server makes is
-recorded in the backend's `activity_logs` with the user id, the endpoint and the
-request body. One shared login turns that audit trail into a single anonymous
-column, on exactly the surface where an agent is making the changes.
+The token is cached at `~/.ic-content-mcp/sessions.json` (0600, in a 0700
+directory) so restarting does not cost you another code. `auth_status` shows
+what is live, `logout` drops it. `login_with_password` still exists for
+headless use, where there is no browser to open.
 
-### One login, several brands
+## Writing
 
-Every tenant is configured with the same JWT secret and the token carries the
-user's e-mail, which each tenant resolves against **its own** users table. So
-one login reaches every brand where that e-mail already has an account, and the
-server reuses the token rather than sending anyone to collect ten one-time
-codes. On a brand where the account does not exist the backend answers 403 with
-"User account has been deleted" — misleading, since nothing was deleted, so the
-server rewrites it to say the account needs adding to that brand.
-
-## Logging in
-
-The backend mails a one-time code on **every** login, for every role
-(`ICBackend/app/service/auth.py`) — there is no headless credential flow, so the
-server exposes the two steps as tools:
+Reads need only a sign-in. **Writes additionally need the brand named in
+`ICMCP_WRITE_PROJECTS`** — a comma-separated list, empty by default, so a fresh
+install can read everything and change nothing:
 
 ```
-login({ project: "istanbul-care" })      → mails a code, returns the challenge id
-submit_otp({ project: "istanbul-care", otp_code: "123456" })
+claude mcp add ic-content -s user \
+  -e ICMCP_WRITE_PROJECTS=istanbul-care,luneste-clinic \
+  -- npx -y github:Istanbul-Care/mcp
 ```
 
-The resulting JWT is cached at `~/.ic-content-mcp/sessions.json` (0600, in a
-0700 directory) so a server restart does not force a fresh code out of the
-editor's inbox. It expires on its own. Set `ICMCP_PERSIST_SESSIONS=0` to keep
-tokens in memory only, or point `ICMCP_SESSION_FILE` elsewhere. `auth_status`
-shows what is live; `logout` drops it.
-
-Each brand is logged into separately — a token for IC does not work against AHC.
+Use your own account rather than a shared one. Every request the server makes
+is recorded in the backend's `activity_logs` with the user id, the endpoint and
+the request body; one shared login collapses that audit trail exactly where an
+agent is doing the writing.
 
 ## Tools
 

@@ -36,11 +36,14 @@ const server = new McpServer(
     instructions:
       "Multi-brand content admin for Istanbul Care and its sibling clinics. Every tool " +
       "takes an explicit `project` — start with list_projects. Reads of published content " +
-      "(search_content, resolve_internal_link, list_languages) work without logging in; " +
-      "anything touching drafts or the admin API needs login + submit_otp for that brand, " +
-      "because the backend mails a one-time code on every login. Never hand-build a blog or " +
-      "service URL — call resolve_internal_link, since the public path depends on the " +
-      "brand's container template and the language.",
+      "(search_content, resolve_internal_link, list_languages) work without signing in. " +
+      "For anything else call `login`: it returns a URL to a sign-in page — give the person " +
+      "that URL and let them type their password and one-time code THERE, never in this " +
+      "chat. One sign-in covers every brand their account exists on, and login reports " +
+      "which. If a brand comes back as having no account, say so plainly; it is a " +
+      "permissions fact an admin has to fix, not something to retry. Never hand-build a " +
+      "blog or service URL — call resolve_internal_link, since the public path depends on " +
+      "the brand\'s container template and the language.",
   },
 );
 
