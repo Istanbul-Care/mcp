@@ -12,7 +12,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { get, post, put, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, fail, guard, projectParam, ensureWritable, ensureVocabulary } from "./helpers.js";
 
 interface HeaderListItem {
   id: number;
@@ -79,7 +79,15 @@ export function registerHeaderTools(server: McpServer): void {
               "('hair-transplant/dhi') — no domain, no locale prefix; the frontend " +
               "prepends the current locale itself, so absolute URLs escape the language.",
           ),
-        item_type: z.string().default("link").describe("e.g. 'link' or 'dropdown'."),
+        item_type: z
+          .string()
+          .default("custom_button")
+          .describe(
+            "custom_button (a normal item, and the only type whose children render as a " +
+              "submenu), service_category or post_category. The site treats every other " +
+              "value as a category menu, so a plain item typed anything else loses its " +
+              "submenu silently.",
+          ),
         parent_id: z.number().int().optional().describe("Parent item id, for dropdown children."),
         order: z.number().int().optional(),
         is_active: z.boolean().default(true),
@@ -90,6 +98,8 @@ export function registerHeaderTools(server: McpServer): void {
       guard(async () => {
         const blocked = ensureWritable(project);
         if (blocked) return fail(blocked);
+        const badValue = ensureVocabulary([["header_item_type", item_type]]);
+        if (badValue) return fail(badValue);
         const response = await post<Envelope<CreatedItem>>(
           project,
           `/admin/headers/${header_id}/items`,

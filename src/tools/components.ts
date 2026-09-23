@@ -16,7 +16,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { get, post, put, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, fail, guard, projectParam, ensureWritable, ensureVocabulary } from "./helpers.js";
 
 /**
  * Create responses come in two shapes: most wrap the new row under `data`
@@ -33,9 +33,14 @@ async function createEntity(
   project: string,
   path: string,
   body: unknown,
+  vocabulary: Array<[string, unknown]> = [],
 ): Promise<ReturnType<typeof ok>> {
   const blocked = ensureWritable(project as never);
   if (blocked) return fail(blocked);
+  // Style/type fields are free strings in the database; a value the site has
+  // no branch for renders as something else with no error anywhere.
+  const badValue = ensureVocabulary(vocabulary);
+  if (badValue) return fail(badValue);
   const response = await post<CreateResponse>(project as never, path, body);
   const id = response.data?.id ?? response.id;
   return ok({ project, id, created: true });
@@ -311,7 +316,7 @@ export function registerComponentTools(server: McpServer): void {
           mobile_background_image_id,
           features,
           icons,
-        }),
+        }, [["hero_style", style]]),
       ),
   );
 
@@ -339,7 +344,10 @@ export function registerComponentTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
-    async ({ project, ...body }) => guard(() => createEntity(project, "/admin/sliders", body)),
+    async ({ project, ...body }) =>
+      guard(() =>
+        createEntity(project, "/admin/sliders", body, [["slider_style", body.style]]),
+      ),
   );
 
   // ---- Processes ---------------------------------------------------------
@@ -520,7 +528,11 @@ export function registerComponentTools(server: McpServer): void {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
     async ({ project, ...body }) =>
-      guard(() => createEntity(project, "/admin/before-afters", body)),
+      guard(() =>
+        createEntity(project, "/admin/before-afters", body, [
+          ["before_after_style", body.style],
+        ]),
+      ),
   );
 
   // ---- Global settings ---------------------------------------------------

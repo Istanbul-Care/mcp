@@ -1,6 +1,7 @@
 import { get, encodeSlugPath } from "../api/client.js";
 import { getProject, type ProjectId } from "../config/projects.js";
 import type { Envelope, SlugLookupData } from "../api/types.js";
+import { classifyLinkValue, type LinkValueMatch } from "./link-values.js";
 
 export interface ResolvedLink {
   resolved: boolean;
@@ -9,6 +10,24 @@ export interface ResolvedLink {
   id: number | null;
   lookupPath: string;
   reason?: string;
+  /**
+   * Set when the value is one of the site's reserved link instructions
+   * (see link-values.ts). Such a value is correct as written and must be
+   * stored verbatim — it is not a path and not a dead link.
+   */
+  reserved?: LinkValueMatch;
+}
+
+/**
+ * Split a query string and/or fragment off a link so it can be reattached
+ * after the path is resolved. Losing them silently breaks filtered blog links
+ * (`?blog-category=…`) and in-page anchors on translation.
+ */
+export function splitLinkSuffix(href: string): { base: string; suffix: string } {
+  const trimmed = href.trim();
+  const cut = trimmed.search(/[?#]/);
+  if (cut <= 0) return { base: trimmed, suffix: "" };
+  return { base: trimmed.slice(0, cut), suffix: trimmed.slice(cut) };
 }
 
 export function hrefToLookupPath(
@@ -52,6 +71,31 @@ export function hrefToLookupPath(
   return segments.join("/");
 }
 
+
+/**
+ * Anchor parsing shared by every link tool.
+ *
+ * The opening tag is kept whole so a rewrite can swap only the href and leave
+ * class, target, rel and title alone. Hrefs may be double-quoted,
+ * single-quoted or bare — matching only double quotes made single-quoted
+ * links invisible.
+ */
+export const ANCHOR_RE = /(<a\b[^>]*>)([\s\S]*?)<\/a>/gi;
+export const HREF_RE = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+
+export function hrefOf(openTag: string): string | null {
+  const m = openTag.match(HREF_RE);
+  if (!m) return null;
+  return m[1] ?? m[2] ?? m[3] ?? null;
+}
+
+export function withHref(openTag: string, nextHref: string): string {
+  return openTag.replace(HREF_RE, (whole) => {
+    const quote = whole.includes('"') ? '"' : whole.includes("'") ? "'" : '"';
+    return `href=${quote}${nextHref}${quote}`;
+  });
+}
+
 export function buildPublicUrl(
   project: ProjectId,
   languageCode: string,
@@ -71,7 +115,24 @@ export async function resolveInternalLink(
   knownLocales: readonly string[],
 ): Promise<ResolvedLink> {
   const { frontendUrl } = getProject(project);
-  const lookupPath = hrefToLookupPath(href, frontendUrl, knownLocales);
+
+  // A reserved value is an instruction to the site, not a URL. Resolving it
+  // as a path would report a working modal trigger as a dead link.
+  const reserved = classifyLinkValue(href);
+  if (reserved) {
+    return {
+      resolved: true,
+      url: reserved.value,
+      type: null,
+      id: null,
+      lookupPath: "",
+      reserved,
+      reason: reserved.effect,
+    };
+  }
+
+  const { base, suffix } = splitLinkSuffix(href);
+  const lookupPath = hrefToLookupPath(base, frontendUrl, knownLocales);
 
   if (lookupPath === null) {
     return {
@@ -127,7 +188,7 @@ export async function resolveInternalLink(
 
   return {
     resolved: true,
-    url: buildPublicUrl(project, targetLanguage, fullPath),
+    url: `${buildPublicUrl(project, targetLanguage, fullPath)}${suffix}`,
     type: data.type,
     id: data.id,
     lookupPath,

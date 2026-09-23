@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { VOCABULARIES } from "../lib/vocabularies.js";
 
 import { get } from "../api/client.js";
 import { PROJECTS, PROJECT_IDS, getProject } from "../config/projects.js";
@@ -15,6 +16,49 @@ import type {
 import { ok, guard, projectParam } from "./helpers.js";
 
 export function registerDiscoveryTools(server: McpServer): void {
+  server.registerTool(
+    "get_vocabularies",
+    {
+      title: "Values the site actually renders",
+      description:
+        "Every field where only a listed value renders: card and hero styles, menu item " +
+        "types, link icons, media types, form field types. These are dropdowns in the admin " +
+        "panel but free strings in the database — nothing validates them, and an unknown " +
+        "value does not error, it just renders the wrong thing or nothing. Check this before " +
+        "setting any type, style, icon or field_type. Needs no authentication.",
+      inputSchema: {
+        field: z
+          .string()
+          .optional()
+          .describe(
+            "Optional vocabulary name, e.g. 'card_type' or 'hero_style'. Omit for all of them.",
+          ),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ field }) =>
+      guard(async () => {
+        if (field) {
+          const key = field.trim();
+          const vocab = VOCABULARIES[key];
+          if (!vocab) {
+            return ok({
+              asked: field,
+              found: false,
+              available: Object.keys(VOCABULARIES),
+            });
+          }
+          return ok({ asked: field, found: true, vocabulary: { name: key, ...vocab } });
+        }
+        return ok({
+          note:
+            "Values marked unrendered are selectable in the admin panel but have no branch " +
+            "on the site. The database accepts any string for all of these fields.",
+          vocabularies: Object.entries(VOCABULARIES).map(([name, v]) => ({ name, ...v })),
+        });
+      }),
+  );
+
   server.registerTool(
     "list_projects",
     {

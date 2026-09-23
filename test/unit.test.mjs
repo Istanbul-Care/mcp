@@ -16,6 +16,17 @@ import {
   MANUAL_SURFACES,
 } from "../dist/lib/translatable.js";
 import { findTranslation, measureCoverage } from "../dist/lib/translation-scan.js";
+import {
+  classifyLinkValue,
+  isReservedLinkValue,
+} from "../dist/lib/link-values.js";
+import {
+  splitLinkSuffix,
+  hrefOf,
+  withHref,
+  ANCHOR_RE,
+} from "../dist/lib/links.js";
+import { checkVocabulary, VOCABULARIES } from "../dist/lib/vocabularies.js";
 
 test("slugify: lowercases, hyphenates, strips accents", () => {
   assert.equal(slugify("Hello World"), "hello-world");
@@ -136,4 +147,120 @@ test("measureCoverage: counts missing, unsourced, and complete rows", () => {
   assert.equal(cov.missing.ar[0].id, 1);
   assert.equal(cov.unsourced.length, 1);
   assert.equal(cov.unsourced[0].id, 3);
+});
+
+// --- Reserved link values -------------------------------------------------
+// The site reads certain link fields as instructions before treating them as
+// URLs. Resolving one as a path reports a working modal trigger as a dead
+// link, so these matchers have to stay exact.
+
+test("classifyLinkValue: recognises the global CTA substitution", () => {
+  assert.equal(classifyLinkValue("cta_url")?.kind, "global-cta");
+});
+
+test("classifyLinkValue: both consultation spellings open the wizard", () => {
+  assert.equal(classifyLinkValue("consultation")?.kind, "consultation-modal");
+  assert.equal(
+    classifyLinkValue("modal-dialog-consultation")?.kind,
+    "consultation-modal",
+  );
+});
+
+test("classifyLinkValue: the modal-dialog prefix carries the form code", () => {
+  const match = classifyLinkValue("modal-dialog-pre-assessment");
+  assert.equal(match?.kind, "multi-page-form-modal");
+  assert.equal(match?.formCode, "modal-dialog-pre-assessment");
+});
+
+test("classifyLinkValue: rich-text lead anchors are reserved", () => {
+  assert.equal(classifyLinkValue("#get-free-consultation")?.worksIn, "rich-text-content");
+  assert.equal(
+    classifyLinkValue("#dialog=get-free-consultation")?.kind,
+    "lead-popup-anchor",
+  );
+});
+
+test("classifyLinkValue: only the exact lead-gated hosts are gated", () => {
+  assert.equal(classifyLinkValue("https://wa.me/905551234567")?.kind, "lead-gated-external");
+  assert.equal(classifyLinkValue("https://wa.link/abc")?.kind, "lead-gated-external");
+  // A near miss must NOT be reported as gated — the site would send the
+  // visitor straight out and the lead would be lost.
+  assert.equal(classifyLinkValue("https://web.whatsapp.com/send"), null);
+  assert.equal(classifyLinkValue("https://www.wa.me/905551234567"), null);
+});
+
+test("classifyLinkValue: an ordinary path is not reserved", () => {
+  assert.equal(classifyLinkValue("/hair-transplant/cost/"), null);
+  assert.equal(isReservedLinkValue("/hair-transplant/cost/"), false);
+});
+
+// --- Link parsing ---------------------------------------------------------
+
+test("splitLinkSuffix: keeps a query string for reattachment", () => {
+  assert.deepEqual(splitLinkSuffix("/blog?blog-category=hair"), {
+    base: "/blog",
+    suffix: "?blog-category=hair",
+  });
+});
+
+test("splitLinkSuffix: keeps a fragment for reattachment", () => {
+  assert.deepEqual(splitLinkSuffix("/about#team"), { base: "/about", suffix: "#team" });
+});
+
+test("hrefOf: reads double, single and unquoted hrefs", () => {
+  assert.equal(hrefOf('<a href="/a/b">'), "/a/b");
+  assert.equal(hrefOf("<a class='x' href='/a/b'>"), "/a/b");
+  assert.equal(hrefOf("<a href=/a/b >"), "/a/b");
+});
+
+test("withHref: swaps the target and keeps every other attribute", () => {
+  assert.equal(
+    withHref('<a class="btn" href="/old/" target="_blank">', "/new/"),
+    '<a class="btn" href="/new/" target="_blank">',
+  );
+});
+
+test("ANCHOR_RE: finds single-quoted anchors too", () => {
+  const html = `<a href="/one">A</a> <a href='/two'>B</a>`;
+  assert.equal([...html.matchAll(ANCHOR_RE)].length, 2);
+});
+
+// --- Vocabularies ---------------------------------------------------------
+
+test("checkVocabulary: accepts a value the site renders", () => {
+  assert.equal(checkVocabulary("card_type", "content").ok, true);
+});
+
+test("checkVocabulary: rejects a value the site has no branch for", () => {
+  assert.equal(checkVocabulary("card_type", "banner").ok, false);
+});
+
+test("checkVocabulary: rejects panel options the site never renders", () => {
+  // Both are selectable in the admin panel but fall through on the site.
+  assert.equal(checkVocabulary("card_type", "media_slider").ok, false);
+  assert.equal(checkVocabulary("hero_style", "coverflow").ok, false);
+});
+
+test("checkVocabulary: slider style is capitalised", () => {
+  assert.equal(checkVocabulary("slider_style", "Timeline").ok, true);
+  assert.equal(checkVocabulary("slider_style", "timeline").ok, false);
+});
+
+test("checkVocabulary: a menu item must be custom_button to keep its submenu", () => {
+  assert.equal(checkVocabulary("header_item_type", "custom_button").ok, true);
+  assert.equal(checkVocabulary("header_item_type", "link").ok, false);
+});
+
+test("checkVocabulary: an empty or unknown field never blocks a write", () => {
+  assert.equal(checkVocabulary("card_type", "").ok, true);
+  assert.equal(checkVocabulary("card_type", undefined).ok, true);
+  assert.equal(checkVocabulary("not_a_vocabulary", "anything").ok, true);
+});
+
+test("every vocabulary states what happens on an unknown value", () => {
+  for (const [name, vocab] of Object.entries(VOCABULARIES)) {
+    assert.ok(vocab.values.length > 0, `${name} has no values`);
+    assert.ok(vocab.on_unknown, `${name} does not say what an unknown value does`);
+    assert.ok(vocab.applies_to, `${name} does not say what it applies to`);
+  }
 });

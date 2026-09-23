@@ -660,11 +660,13 @@ export function registerPageTools(server: McpServer): void {
     {
       title: "Edit a page / compose its body",
       description:
-        "Updates a page's structure: its cover image, header/footer/parent, and the body " +
-        "sections (cards, heroes, sliders, forms). Each section array you pass REPLACES that " +
-        "section wholesale — pass the full desired list of {id, order?}; sections you omit are " +
-        "left unchanged. To add or remove one item, read get_page for the current ids first. " +
-        "This is how images (via image cards) and forms are added to or removed from a page. " +
+        "Updates a page's structure: its cover image, header/footer/parent, and every body " +
+        "section — cards, heroes, sliders, forms, processes, before/afters, packages, price " +
+        "comparisons, promotional landings and map sections. Each section array you pass " +
+        "REPLACES that section wholesale — pass the full desired list of {id, order?}; " +
+        "sections you omit are left unchanged. To add or remove one item, read get_page for " +
+        "the current ids first. Note that `order` is a single sequence across ALL section " +
+        "types on the page, not per type: a hero at order 5 renders below a card at order 2. " +
         "Requires login and a write-enabled brand.",
       inputSchema: {
         project: projectParam,
@@ -676,8 +678,28 @@ export function registerPageTools(server: McpServer): void {
         cards: orderedItems.optional(),
         heroes: orderedItems.optional(),
         sliders: orderedItems.optional(),
-        contact_forms: orderedItems.optional(),
+        contact_forms: orderedItems
+          .optional()
+          .describe(
+            "Only the first contact form on a page renders, and it is suppressed entirely " +
+              "when the page has page_content, a blog layout, or a card of type 'content'.",
+          ),
         multi_page_forms: orderedItems.optional(),
+        processes: orderedItems
+          .optional()
+          .describe("Only the first process on a page renders."),
+        before_afters: orderedItems
+          .optional()
+          .describe(
+            "All style_4 galleries on a page merge into one filterable block using the " +
+              "first one's order; style_1–3 each render separately.",
+          ),
+        packages: orderedItems.optional(),
+        price_compares: orderedItems.optional(),
+        promotional_landings: orderedItems.optional(),
+        google_map_sections: orderedItems
+          .optional()
+          .describe("Grid columns are ignored for map sections; they always span full width."),
         page_content: pageContentParam.optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },

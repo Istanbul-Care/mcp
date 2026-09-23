@@ -4,7 +4,15 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { get, put } from "../api/client.js";
 import type { Envelope, PostDetail } from "../api/types.js";
 import { slugify, isValidSlug, auditSlug } from "../lib/slug.js";
-import { resolveInternalLink, hrefToLookupPath } from "../lib/links.js";
+import {
+  resolveInternalLink,
+  hrefToLookupPath,
+  splitLinkSuffix,
+  ANCHOR_RE,
+  hrefOf,
+  withHref,
+} from "../lib/links.js";
+import { classifyLinkValue } from "../lib/link-values.js";
 import { getProject } from "../config/projects.js";
 import {
   ok,
@@ -16,7 +24,6 @@ import {
 } from "./helpers.js";
 
 /** Matches an anchor and captures its href and inner HTML. */
-const ANCHOR_RE = /<a\s[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gis;
 
 export interface LinkFinding {
   href: string;
@@ -36,8 +43,14 @@ export async function auditLinks(
   const uniqueHrefs = [
     ...new Set(
       anchors
-        .map((m) => m[1] ?? "")
-        .filter((href) => hrefToLookupPath(href, frontendUrl, locales) !== null),
+        .map((m) => hrefOf(m[1] ?? "") ?? "")
+        .filter((href) => {
+          if (!href) return false;
+          // A reserved value is an instruction to the site, not a URL — it has
+          // no page to resolve and must never be reported as a dead link.
+          if (classifyLinkValue(href)) return false;
+          return hrefToLookupPath(splitLinkSuffix(href).base, frontendUrl, locales) !== null;
+        }),
     ),
   ];
 
@@ -242,8 +255,14 @@ export function registerContentQualityTools(server: McpServer): void {
         const uniqueHrefs = [
           ...new Set(
             anchors
-              .map((m) => m[1] ?? "")
-              .filter((href) => hrefToLookupPath(href, frontendUrl, locales) !== null),
+              .map((m) => hrefOf(m[1] ?? "") ?? "")
+              .filter((href) => {
+                if (!href) return false;
+                if (classifyLinkValue(href)) return false;
+                return (
+                  hrefToLookupPath(splitLinkSuffix(href).base, frontendUrl, locales) !== null
+                );
+              }),
           ),
         ];
         const resolutions = new Map(
@@ -257,7 +276,18 @@ export function registerContentQualityTools(server: McpServer): void {
 
         const rewritten = original.replace(
           ANCHOR_RE,
-          (whole: string, href: string, inner: string) => {
+          (whole: string, openTag: string, inner: string) => {
+            const href = hrefOf(openTag);
+            if (href === null) return whole;
+            const reserved = classifyLinkValue(href);
+            if (reserved) {
+              report.push({
+                href,
+                action: "reserved",
+                reason: `${reserved.kind} — left verbatim`,
+              });
+              return whole;
+            }
             const res = resolutions.get(href);
             if (!res) {
               return whole;
@@ -265,7 +295,7 @@ export function registerContentQualityTools(server: McpServer): void {
             if (res.resolved && res.url) {
               if (res.url !== href) {
                 report.push({ href, action: "rewritten", url: res.url });
-                return `<a href="${res.url}">${inner}</a>`;
+                return `${withHref(openTag, res.url)}${inner}</a>`;
               }
               return whole;
             }

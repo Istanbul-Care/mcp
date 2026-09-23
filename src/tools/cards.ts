@@ -12,7 +12,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { get, post, put, del } from "../api/client.js";
 import type { Envelope, LanguageInfo } from "../api/types.js";
 import type { ProjectId } from "../config/projects.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, fail, guard, projectParam, ensureWritable, ensureVocabulary } from "./helpers.js";
 
 interface CreatedCard {
   id: number;
@@ -291,6 +291,11 @@ export function registerCardTools(server: McpServer): void {
       guard(async () => {
         const blocked = ensureWritable(project);
         if (blocked) return fail(blocked);
+        const badValue = ensureVocabulary([
+          ["card_type", body.type],
+          ["card_text_position", body.text_position],
+        ]);
+        if (badValue) return fail(badValue);
         const response = await post<Envelope<CreatedCard>>(project, "/admin/cards", body);
         return ok({
           project,
@@ -336,6 +341,11 @@ export function registerCardTools(server: McpServer): void {
       guard(async () => {
         const blocked = ensureWritable(project);
         if (blocked) return fail(blocked);
+        const badValue = ensureVocabulary([
+          ["card_type", body.type],
+          ["card_text_position", body.text_position],
+        ]);
+        if (badValue) return fail(badValue);
         await put(project, `/admin/cards/${card_id}`, body);
         return ok({ project, card_id, updated: true });
       }),

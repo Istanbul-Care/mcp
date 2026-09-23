@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { checkVocabulary } from "../lib/vocabularies.js";
 import { PROJECT_IDS, isProjectId, type ProjectId } from "../config/projects.js";
 import { get } from "../api/client.js";
 import type { Envelope, LanguageListData, LanguageListItem } from "../api/types.js";
@@ -105,4 +106,22 @@ export async function resolveLanguageIds(
     );
   }
   return resolved;
+}
+
+/**
+ * Reject a value the site would not render.
+ *
+ * These fields are dropdowns in the admin panel and free strings in the
+ * database, so a wrong value reaches production without a single error and
+ * then renders the wrong block, or nothing. Returns an error string to hand
+ * straight to `fail()`, or null when the value is fine.
+ */
+export function ensureVocabulary(
+  checks: Array<[vocabulary: string, value: unknown]>,
+): string | null {
+  for (const [name, value] of checks) {
+    const result = checkVocabulary(name, value);
+    if (!result.ok) return result.message ?? `Invalid value for ${name}.`;
+  }
+  return null;
 }

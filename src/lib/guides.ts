@@ -56,7 +56,50 @@ at least one external link.
 - One focus keyword per post; title, meta, slug and opening line must agree.
 - No medical/dental guarantees, specific outcomes, graft/tooth counts, or prices
   unless the brand guide permits; never invent clinical facts.
-- Write only in the brand's active languages (list_languages).`;
+- Write only in the brand's active languages (list_languages).
+
+## Conventions nothing validates
+
+These are the rules the database does not enforce and the panel does not
+explain. Breaking one produces no error anywhere — the page simply renders
+the wrong thing.
+
+**Link values that are instructions, not URLs.** \`cta_url\`, \`consultation\`,
+anything starting with \`modal-dialog-\`, and the rich-text anchors
+\`#get-free-consultation\` / \`#dialog=get-free-consultation\`. Call
+get_link_conventions before writing any button_url or menu URL. They work on
+card, hero, CTA and footer-bottom links, and **do not work** in the header
+menu or the top footer sections, where they 404.
+
+**Fixed vocabularies.** Card type, hero/footer/slider/before-after/FAQ style,
+menu item type, link icon, media type, form field type. Call get_vocabularies;
+the write tools reject a value the site cannot render.
+
+**Position that carries meaning.**
+- \`order\` is one sequence across *all* section types on a page, not per type.
+- In the consultation wizard, the option with \`sort_order = 1\` means "woman"
+  on the gender page and "No" on the had-a-transplant page, and the second one
+  is what makes the wizard skip a step.
+- Wizard page order is semantic: gender, hair loss, duration, had-transplant,
+  when, then the contact fields. Inserting a page mislabels every stored answer.
+- A medical-history option must read exactly \`yes\` to reveal its follow-up
+  fields. Translating it to Evet/Ja/Oui hides them permanently.
+- The form page titled exactly \`name\` supplies the lead's name.
+- Only the first process and the first contact form on a page render.
+
+**Layout side effects.** Enabling page content, a blog layout, or adding a card
+of type \`content\` removes the page's standalone contact form, because those
+layouts render the form themselves.
+
+**Formats inside text columns.** A \`word_cloud\` card's description must be a
+JSON array of {title, description}. \`focus_keyword\` is split on the pipe
+character by the site. \`currency\` must be an ISO-4217 code or the price
+renders with no symbol. For \`youtube.*\` and \`tiktok.*\` media the stored url
+must be the bare video id.
+
+**Two deliberate oddities — do not "correct" them.** The attribution value
+\`seo-refferal\` is misspelled to match the backend, and \`graftCalculator\` is
+the only camelCase key in an otherwise snake_case page payload.`;
 
 export interface BrandGuide {
   name: string;
