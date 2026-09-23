@@ -7,7 +7,6 @@ export type ProjectId =
   | "ic-dental-group"
   | "luneste-clinic"
   | "capelli-albanian"
-  | "capelliport"
   | "emperial-hair-clinic"
   | "staging";
 
@@ -93,15 +92,6 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     mediaBaseUrl: "https://api.ca.istanbul-care.com",
     frontendUrl: "https://main.d3uorp0agsozpd.amplifyapp.com",
     defaultLanguage: "en",
-  },
-  capelliport: {
-    id: "capelliport",
-    name: "Capelli Port",
-    shortName: "CP",
-    apiBaseUrl: "https://api.capelliport.istanbul-care.com/v1",
-    mediaBaseUrl: "https://api.capelliport.istanbul-care.com",
-    frontendUrl: "https://capelliport.it",
-    defaultLanguage: "it",
   },
   "emperial-hair-clinic": {
     id: "emperial-hair-clinic",

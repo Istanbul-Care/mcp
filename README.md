@@ -4,8 +4,11 @@ MCP server for the multi-brand content admin behind Istanbul Care and its siblin
 clinics. Gives an agent typed access to the blog admin API, the SEO audit, and —
 importantly — the only correct way to build an internal URL.
 
-Covers all 11 brands in `src/config/projects.ts`, including IC, AHC
-(`albanian-hair-klinik`) and Dental (`ic-dental-group`).
+Covers the 10 live brands in `src/config/projects.ts`, including IC, AHC
+(`albanian-hair-klinik`) and Dental (`ic-dental-group`). A brand belongs here
+only while its API is served by the shared backend — Capelli Port was listed
+until its project was cancelled, and a dead entry costs an agent a timeout
+rather than an error.
 
 ## Status
 
