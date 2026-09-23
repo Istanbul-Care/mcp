@@ -291,10 +291,18 @@ test("checkWordCloudDescription: rejects entries with no title", () => {
   assert.equal(checkWordCloudDescription(JSON.stringify([{ description: "x" }])).ok, false);
 });
 
-test("checkFocusKeyword: the site splits on '|', not ','", () => {
-  assert.equal(checkFocusKeyword("hair transplant|fue").ok, true);
+test("checkFocusKeyword: one keyword, whichever separator was used", () => {
+  // The audit substring-matches the WHOLE stored value, so a pipe list is no
+  // better than a comma list — both fail every keyword check forever.
   assert.equal(checkFocusKeyword("hair transplant").ok, true);
+  assert.equal(checkFocusKeyword("hair transplant|fue|turkey").ok, false);
   assert.equal(checkFocusKeyword("hair transplant, fue, turkey").ok, false);
+});
+
+test("checkFocusKeyword: the message names the keyword to keep", () => {
+  // An editor fixing 200 posts needs the answer, not the diagnosis.
+  const result = checkFocusKeyword("hair transplant cost,hair transplant cost turkey");
+  assert.match(result.message, /'hair transplant cost'/);
 });
 
 test("checkCurrency: only an ISO-4217 code renders a symbol", () => {

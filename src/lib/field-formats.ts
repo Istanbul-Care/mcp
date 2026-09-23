@@ -58,23 +58,37 @@ export function checkWordCloudDescription(value: unknown): FormatCheck {
 }
 
 /**
- * The site splits focus keywords on the pipe character. The admin panel
- * validates them as comma-separated, up to ten — the two disagree, and a
- * comma-separated value is read as one long keyword today.
+ * Focus keyword: one keyword, no separator.
+ *
+ * Three parties disagree about this field and only one of them matters.
+ * The admin panel validates it as a comma-separated list of up to ten. The
+ * site splits it on the PIPE character to build the `keywords` meta tag,
+ * which no search engine has read since 2009. The backend's SEO audit — the
+ * one thing that actually gates publishing — never splits it at all:
+ * `audit_post_seo` asks whether the WHOLE stored string appears in the meta
+ * title, in the meta description, in the slug, and in the first 150 characters
+ * of the body, then counts its occurrences for the density score.
+ *
+ * So any separator at all, comma or pipe, makes five checks fail forever: no
+ * meta title contains "hair transplant cost,hair transplant cost germany,…".
+ * The content can be perfect and the post still audits as broken, which is
+ * exactly the signal an editor then learns to ignore.
  */
 export function checkFocusKeyword(value: unknown): FormatCheck {
   if (typeof value !== "string" || !value.trim()) return ok;
-  if (value.includes("|")) return ok;
-  if (value.includes(",")) {
-    return {
-      ok: false,
-      message:
-        "The site splits focus keywords on '|', not ','. A comma-separated value is read as " +
-        "one long keyword. Use 'hair transplant|fue|turkey', or a single keyword with no " +
-        "separator at all.",
-    };
-  }
-  return ok;
+  const separator = value.includes("|") ? "|" : value.includes(",") ? "," : null;
+  if (!separator) return ok;
+  const first = value.split(separator)[0]?.trim() || "the main one";
+  return {
+    ok: false,
+    message:
+      `focus_keyword holds several keywords separated by '${separator}'. The SEO audit ` +
+      `matches the WHOLE string against the title, the description, the slug and the ` +
+      `opening of the body, so it can never pass and the post stays permanently red. ` +
+      `Store one keyword — '${first}' — and work the variants into the copy instead. ` +
+      `(The panel offers a comma-separated list and the site splits on '|' for the legacy ` +
+      `keywords meta tag; neither changes what the audit does.)`,
+  };
 }
 
 /** ISO-4217. Anything else renders the price as a bare number, silently. */

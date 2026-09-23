@@ -119,8 +119,10 @@ of type \`content\` removes the page's standalone contact form, because those
 layouts render the form themselves.
 
 **Formats inside text columns.** A \`word_cloud\` card's description must be a
-JSON array of {title, description}. \`focus_keyword\` is split on the pipe
-character by the site. \`currency\` must be an ISO-4217 code or the price
+JSON array of {title, description}. \`focus_keyword\` must hold exactly ONE
+keyword: the SEO audit matches the whole stored string against the title, the
+description, the slug and the opening of the body, so any comma- or
+pipe-separated list fails all five checks forever. \`currency\` must be an ISO-4217 code or the price
 renders with no symbol. For \`youtube.*\` and \`tiktok.*\` media the stored url
 must be the bare video id.
 
