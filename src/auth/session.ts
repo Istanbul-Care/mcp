@@ -142,8 +142,37 @@ export function clearSession(project: ProjectId): void {
   persistSessions();
 }
 
+/**
+ * A token for this brand — or, failing that, anyone else's.
+ *
+ * Every tenant is configured with the SAME JWT secret, and the token carries
+ * the user's e-mail as its subject, which each tenant then looks up in its own
+ * users table. So a token minted by one brand authenticates against all of
+ * them, for a person whose account exists there. Without this fallback the
+ * server would send an editor to collect ten separate one-time codes out of
+ * their inbox to do one afternoon's work.
+ *
+ * It is a borrow, not an escalation: the receiving brand still resolves the
+ * e-mail against its own users and applies its own role. A person with no
+ * account on that brand gets a 403 there, exactly as they should.
+ */
 export function getToken(project: ProjectId): string | null {
-  return getSession(project)?.token ?? null;
+  const own = getSession(project);
+  if (own) return own.token;
+  for (const other of sessions.keys()) {
+    const borrowed = getSession(other);
+    if (borrowed) return borrowed.token;
+  }
+  return null;
+}
+
+/** Which brand's login is actually carrying this call, for auth_status. */
+export function tokenSource(project: ProjectId): ProjectId | null {
+  if (getSession(project)) return project;
+  for (const other of sessions.keys()) {
+    if (getSession(other)) return other;
+  }
+  return null;
 }
 
 export function describeSessions(): Array<{

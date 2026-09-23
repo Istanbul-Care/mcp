@@ -42,6 +42,38 @@ npm run build
 
 Copy `.env.example` for the full list of environment variables.
 
+## Setting it up for someone who writes content
+
+The server runs locally, so each person needs their own copy registered with
+whichever Claude app they use. `npm run setup` writes that entry for them —
+merging into the config, never replacing what is already there:
+
+```
+git clone git@github.com:Istanbul-Care/mcp.git && cd mcp
+npm install                      # builds on install
+npm run setup -- --email you@istanbul-care.com --brands istanbul-care
+```
+
+It asks for the password, stores it only in the app's own config file and locks
+that file to 0600, and prints the equivalent `claude mcp add` line for Claude
+Code. `--no-password` skips storing one; `--brands` is the write gate, and
+leaving it off means read-only.
+
+**Use a personal account, not a shared one.** Every request the server makes is
+recorded in the backend's `activity_logs` with the user id, the endpoint and the
+request body. One shared login turns that audit trail into a single anonymous
+column, on exactly the surface where an agent is making the changes.
+
+### One login, several brands
+
+Every tenant is configured with the same JWT secret and the token carries the
+user's e-mail, which each tenant resolves against **its own** users table. So
+one login reaches every brand where that e-mail already has an account, and the
+server reuses the token rather than sending anyone to collect ten one-time
+codes. On a brand where the account does not exist the backend answers 403 with
+"User account has been deleted" — misleading, since nothing was deleted, so the
+server rewrites it to say the account needs adding to that brand.
+
 ## Logging in
 
 The backend mails a one-time code on **every** login, for every role

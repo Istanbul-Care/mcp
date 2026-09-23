@@ -14,6 +14,20 @@ export class ApiError extends Error {
   }
 }
 
+/** Signed in, but with an account that does not exist on THIS brand. */
+export class NoAccountOnBrandError extends Error {
+  constructor(readonly project: ProjectId) {
+    super(
+      `Your login is valid, but the account it belongs to has no user on '${project}'. ` +
+        `The brands share one sign-in secret, so a token from any brand is accepted ` +
+        `everywhere — but each brand resolves it against its own users table. Ask an admin ` +
+        `to add your e-mail as a user on '${project}', or work on a brand where you already ` +
+        `have one (auth_status shows which login is in play).`,
+    );
+    this.name = "NoAccountOnBrandError";
+  }
+}
+
 export class AuthRequiredError extends Error {
   constructor(readonly project: ProjectId) {
     super(
@@ -132,7 +146,15 @@ export async function request<T>(
     if (response.status === 401 && auth) {
       throw new AuthRequiredError(project);
     }
-    throw new ApiError(response.status, await extractDetail(response), url);
+    const detail = await extractDetail(response);
+    // The brands share a JWT secret but not a users table, so a token borrowed
+    // from another brand is accepted as genuine and then fails to resolve to
+    // anyone here. The backend's wording for that ("User account has been
+    // deleted") sends people looking for a deleted account that never existed.
+    if (response.status === 403 && auth && /account has been deleted/i.test(detail)) {
+      throw new NoAccountOnBrandError(project);
+    }
+    throw new ApiError(response.status, detail, url);
   }
 
   if (response.status === 204) return undefined as T;

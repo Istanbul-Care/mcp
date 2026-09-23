@@ -14,7 +14,9 @@
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
     "check:translatable": "node scripts/check-translatable.mjs",
-    "test": "npm run build && node --test test/*.test.mjs"
+    "test": "npm run build && node --test test/*.test.mjs",
+    "prepare": "tsc",
+    "setup": "node scripts/setup.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -26,5 +28,10 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
-  }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    ".env.example"
+  ]
 }
