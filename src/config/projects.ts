@@ -3,7 +3,6 @@ export type ProjectId =
   | "istanbul-care"
   | "albanian-hair-klinik"
   | "royal-hair"
-  | "royal-hair-dominic"
   | "ic-dental-group"
   | "luneste-clinic"
   | "capelli-albanian"
@@ -57,18 +56,6 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     frontendUrl: "https://royalhairistanbul.com",
     defaultLanguage: "en",
   },
-  // No live frontend: the Amplify preview below no longer resolves, and
-  // dominic.istanbul-care.com is a different site that 404s on this tenant's
-  // own pages. Public-URL tools cannot work here until a real domain exists.
-  "royal-hair-dominic": {
-    id: "royal-hair-dominic",
-    name: "Royal Hair Dominic",
-    shortName: "RHD",
-    apiBaseUrl: "https://api.rh-dominic.istanbul-care.com/v1",
-    mediaBaseUrl: "https://api.rh-dominic.istanbul-care.com",
-    frontendUrl: "https://main.d2dylfmvgck5cz.amplifyapp.com",
-    defaultLanguage: "en",
-  },
   "ic-dental-group": {
     id: "ic-dental-group",
     name: "IC Dental Group",
@@ -87,9 +74,10 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     frontendUrl: "https://lunesteclinic.com",
     defaultLanguage: "en",
   },
-  // No live frontend and no content: the Amplify preview is gone and the
-  // tenant has zero published pages. capellialbania.com is a WordPress site,
-  // not this stack.
+  // Not launched yet: no domain, and the tenant has no published pages. The
+  // Amplify preview below no longer resolves either, so the public-URL tools
+  // have nothing to point at. capellialbania.com is someone else's WordPress
+  // site, not this brand's front end.
   "capelli-albanian": {
     id: "capelli-albanian",
     name: "Capelli Albanian",
@@ -99,6 +87,7 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     frontendUrl: "https://main.d3uorp0agsozpd.amplifyapp.com",
     defaultLanguage: "en",
   },
+  // Not launched yet: no domain assigned.
   "emperial-hair-clinic": {
     id: "emperial-hair-clinic",
     name: "Emperial Hair Clinic",
