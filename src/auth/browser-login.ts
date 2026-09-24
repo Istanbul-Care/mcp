@@ -24,7 +24,7 @@ import { randomBytes } from "node:crypto";
 import type { AddressInfo } from "node:net";
 
 import { PROJECT_IDS, getProject, type ProjectId } from "../config/projects.js";
-import { setSession, type AuthedUser } from "./session.js";
+import { setSession, getSession, getToken, type AuthedUser } from "./session.js";
 
 const FLOW_TIMEOUT_MS = 10 * 60_000;
 
@@ -44,8 +44,13 @@ type LoginReply = LoginOk | LoginChallenge;
 
 export interface BrandAccess {
   project: ProjectId;
-  allowed: boolean;
+  /** "yes" — usable. "no" — the account does not exist here. "unknown" — the
+   *  check itself failed, which is NOT the same thing and must not be shown
+   *  as a refusal. */
+  access: "yes" | "no" | "unknown";
   role?: string;
+  /** Why, when access is "no" or "unknown". */
+  detail?: string;
 }
 
 export interface FlowResult {
@@ -96,26 +101,78 @@ async function callLogin(project: ProjectId, body: unknown): Promise<LoginReply>
  * own users table; a 403 means it does not, and no amount of retrying changes
  * that.
  */
-async function probeBrands(token: string, expiresIn: number, user: AuthedUser): Promise<BrandAccess[]> {
-  const results = await Promise.all(
-    PROJECT_IDS.map(async (project): Promise<BrandAccess> => {
-      const { apiBaseUrl } = getProject(project);
-      try {
-        const response = await fetch(`${apiBaseUrl.replace(/\/+$/, "")}/auth/me`, {
-          headers: { authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(20_000),
-        });
-        if (!response.ok) return { project, allowed: false };
-        const body = (await response.json()) as { data?: { role?: string }; role?: string };
-        const role = body.data?.role ?? body.role;
-        setSession(project, token, expiresIn / 60, { ...user, ...(role ? { role } : {}) });
-        return { project, allowed: true, ...(role ? { role } : {}) };
-      } catch {
-        return { project, allowed: false };
-      }
-    }),
+async function probeBrands(
+  token: string,
+  expiresIn: number,
+  user: AuthedUser,
+): Promise<BrandAccess[]> {
+  return Promise.all(
+    PROJECT_IDS.map((project) => probeOne(project, token, expiresIn, user)),
   );
-  return results;
+}
+
+/**
+ * Ask one brand whether this token works there.
+ *
+ * Deliberately NOT /auth/me: that endpoint loads the avatar with its
+ * translations and builds the whole permission matrix, so it can fail for
+ * reasons that have nothing to do with access — and the first version of this
+ * code reported every such failure as "no account", which told an editor with
+ * five brands that they had three.
+ *
+ * /admin/languages is the cheapest authenticated read there is, and it is
+ * exactly the kind of call the rest of the server makes, so a brand that
+ * passes here is a brand the tools can actually use.
+ */
+async function probeOne(
+  project: ProjectId,
+  token: string,
+  expiresIn: number,
+  user: AuthedUser,
+  attempt = 1,
+): Promise<BrandAccess> {
+  const { apiBaseUrl } = getProject(project);
+  const base = apiBaseUrl.replace(/\/+$/, "");
+  try {
+    const response = await fetch(`${base}/admin/languages?limit=1`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(20_000),
+    });
+
+    if (response.ok) {
+      setSession(project, token, expiresIn / 60, user);
+      const role = await roleOn(base, token);
+      return { project, access: "yes", ...(role ? { role } : {}) };
+    }
+
+    // 401/403 are the real answer: this brand has no user with that e-mail.
+    if (response.status === 401 || response.status === 403) {
+      return { project, access: "no", detail: "no user with this e-mail here" };
+    }
+
+    // Anything else is the check failing, not permission being refused.
+    if (attempt === 1) return probeOne(project, token, expiresIn, user, 2);
+    return { project, access: "unknown", detail: `the brand answered ${response.status}` };
+  } catch (error) {
+    if (attempt === 1) return probeOne(project, token, expiresIn, user, 2);
+    const reason = error instanceof Error ? error.message : String(error);
+    return { project, access: "unknown", detail: `could not reach it (${reason})` };
+  }
+}
+
+/** The role, if the profile endpoint feels like answering. Never load-bearing. */
+async function roleOn(base: string, token: string): Promise<string | undefined> {
+  try {
+    const response = await fetch(`${base}/auth/me`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return undefined;
+    const body = (await response.json()) as { data?: { role?: string }; role?: string };
+    return body.data?.role ?? body.role;
+  } catch {
+    return undefined;
+  }
 }
 
 function send(res: ServerResponse, status: number, body: string, type = "text/html; charset=utf-8"): void {
@@ -308,17 +365,26 @@ ${error ? `<div class="err">${esc(error)}</div>` : ""}`,
     ),
 
   done: (user: AuthedUser, access: BrandAccess[]): string => {
-    const yes = access.filter((a) => a.allowed);
-    const no = access.filter((a) => !a.allowed);
-    const row = (a: BrandAccess, allowed: boolean): string =>
-      `<li${allowed ? "" : ' class="no"'}>${allowed ? "✓" : "—"} ${esc(getProject(a.project).name)}${
-        allowed && a.role ? ` <span class="no">· ${esc(a.role)}</span>` : ""
+    const yes = access.filter((a) => a.access === "yes");
+    const no = access.filter((a) => a.access === "no");
+    const unknown = access.filter((a) => a.access === "unknown");
+    const row = (a: BrandAccess, mark: string, dim: boolean): string =>
+      `<li${dim ? ' class="no"' : ""}>${mark} ${esc(getProject(a.project).name)}${
+        a.role ? ` <span class="no">· ${esc(a.role)}</span>` : ""
       }</li>`;
     return SHELL(
       "Signed in",
       `<h1>Signed in as ${esc(user.full_name || user.email)}</h1>
 <p class="sub">You can close this tab and go back to the chat.</p>
-<ul>${yes.map((a) => row(a, true)).join("")}</ul>
+<ul>${yes.map((a) => row(a, "✓", false)).join("")}</ul>
+${
+  unknown.length
+    ? `<div class="err">Could not check ${unknown
+        .map((a) => esc(getProject(a.project).name))
+        .join(", ")} — that is a failed check, not a refusal. Ask Claude to run
+        recheck_access.</div>`
+    : ""
+}
 ${
   no.length
     ? `<p class="sub" style="margin:18px 0 0">No account on ${no
@@ -331,3 +397,17 @@ ${
 
   notFound: (): string => SHELL("Not found", `<h1>Nothing here</h1><p class="sub">This sign-in link is not valid any more. Ask Claude to start the login again.</p>`),
 };
+
+/** Re-run the access probe with the token already held. */
+export async function recheckAccess(): Promise<BrandAccess[] | null> {
+  for (const project of PROJECT_IDS) {
+    const token = getToken(project);
+    if (token) {
+      const session = getSession(project);
+      if (!session) continue;
+      const remainingSeconds = Math.max(60, (session.expiresAt - Date.now()) / 1000);
+      return probeBrands(token, remainingSeconds, session.user);
+    }
+  }
+  return null;
+}

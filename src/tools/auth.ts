@@ -14,7 +14,7 @@ import {
   type AuthedUser,
 } from "../auth/session.js";
 import { ok, fail, guard, projectParam } from "./helpers.js";
-import { startBrowserLogin } from "../auth/browser-login.js";
+import { startBrowserLogin, recheckAccess } from "../auth/browser-login.js";
 import type { ProjectId } from "../config/projects.js";
 
 interface LoginChallengeResponse {
@@ -87,17 +87,49 @@ export function registerAuthTools(server: McpServer): void {
         }
         if (outcome.kind === "failed") return fail(outcome.message);
 
-        const allowed = outcome.result.access.filter((a) => a.allowed).map((a) => a.project);
-        const denied = outcome.result.access.filter((a) => !a.allowed).map((a) => a.project);
+        const by = (state: string) =>
+          outcome.result.access.filter((a) => a.access === state).map((a) => a.project);
+        const unknown = outcome.result.access.filter((a) => a.access === "unknown");
         return ok({
           signed_in_as: outcome.result.user.email,
-          brands_you_can_work_on: allowed,
-          brands_without_an_account: denied,
+          brands_you_can_work_on: by("yes"),
+          brands_without_an_account: by("no"),
+          brands_we_could_not_check: unknown.map((a) => `${a.project} (${a.detail})`),
           note:
-            denied.length > 0
-              ? "Those brands have no user with this e-mail. An admin has to add one; " +
-                "nothing here can grant it."
-              : "Every brand accepted this account.",
+            unknown.length > 0
+              ? "The brands under brands_we_could_not_check were NOT refused — the check " +
+                "itself failed. Tell the user that, and offer recheck_access; do not report " +
+                "them as missing access."
+              : by("no").length > 0
+                ? "Those brands have no user with this e-mail. An admin has to add one."
+                : "Every brand accepted this account.",
+        });
+      }),
+  );
+
+  server.registerTool(
+    "recheck_access",
+    {
+      title: "Re-check which brands this login reaches",
+      description:
+        "Runs the per-brand access check again using the token already held, without another " +
+        "sign-in. Use it when login reported brands it could not check, or after an admin " +
+        "adds the account to a brand.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async () =>
+      guard(async () => {
+        const access = await recheckAccess();
+        if (!access) return fail("Not signed in — call login first.");
+        const by = (state: string) =>
+          access.filter((a) => a.access === state).map((a) => a.project);
+        return ok({
+          brands_you_can_work_on: by("yes"),
+          brands_without_an_account: by("no"),
+          brands_we_could_not_check: access
+            .filter((a) => a.access === "unknown")
+            .map((a) => `${a.project} (${a.detail})`),
         });
       }),
   );
