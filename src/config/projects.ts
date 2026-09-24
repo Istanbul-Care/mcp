@@ -57,13 +57,16 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     frontendUrl: "https://royalhairistanbul.com",
     defaultLanguage: "en",
   },
+  // No live frontend: the Amplify preview below no longer resolves, and
+  // dominic.istanbul-care.com is a different site that 404s on this tenant's
+  // own pages. Public-URL tools cannot work here until a real domain exists.
   "royal-hair-dominic": {
     id: "royal-hair-dominic",
     name: "Royal Hair Dominic",
     shortName: "RHD",
     apiBaseUrl: "https://api.rh-dominic.istanbul-care.com/v1",
     mediaBaseUrl: "https://api.rh-dominic.istanbul-care.com",
-    frontendUrl: "https://dominic.istanbul-care.com",
+    frontendUrl: "https://main.d2dylfmvgck5cz.amplifyapp.com",
     defaultLanguage: "en",
   },
   "ic-dental-group": {
@@ -72,7 +75,7 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     shortName: "ICD",
     apiBaseUrl: "https://api.icd.istanbul-care.com/v1",
     mediaBaseUrl: "https://api.icd.istanbul-care.com",
-    frontendUrl: "https://icdentalgroup.com",
+    frontendUrl: "https://istanbulcaredental.com",
     defaultLanguage: "en",
   },
   "luneste-clinic": {
@@ -84,13 +87,16 @@ export const PROJECTS: Record<ProjectId, ProjectConfig> = {
     frontendUrl: "https://lunesteclinic.com",
     defaultLanguage: "en",
   },
+  // No live frontend and no content: the Amplify preview is gone and the
+  // tenant has zero published pages. capellialbania.com is a WordPress site,
+  // not this stack.
   "capelli-albanian": {
     id: "capelli-albanian",
     name: "Capelli Albanian",
     shortName: "CA",
     apiBaseUrl: "https://api.ca.istanbul-care.com/v1",
     mediaBaseUrl: "https://api.ca.istanbul-care.com",
-    frontendUrl: "https://capellialbania.com",
+    frontendUrl: "https://main.d3uorp0agsozpd.amplifyapp.com",
     defaultLanguage: "en",
   },
   "emperial-hair-clinic": {
