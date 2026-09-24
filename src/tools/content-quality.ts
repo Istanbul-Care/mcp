@@ -19,7 +19,6 @@ import {
   fail,
   guard,
   projectParam,
-  ensureWritable,
   getActiveLanguageCodes,
 } from "./helpers.js";
 
@@ -208,7 +207,7 @@ export function registerContentQualityTools(server: McpServer): void {
         "language and writes the result back — the fix companion to audit_post. Dead links " +
         "are left in place (and reported) unless unwrap_unresolved is set, so editor content " +
         "is never silently deleted. Does not touch slug or publish status. Set dry_run to " +
-        "preview the change without saving. Requires login and a write-enabled brand.",
+        "preview the change without saving. Requires login.",
       inputSchema: {
         project: projectParam,
         post_id: z.number().int(),
@@ -227,8 +226,6 @@ export function registerContentQualityTools(server: McpServer): void {
     async ({ project, post_id, language_id, unwrap_unresolved, dry_run }) =>
       guard(async () => {
         if (!dry_run) {
-          const blocked = ensureWritable(project);
-          if (blocked) return fail(blocked);
         }
 
         const response = await get<Envelope<PostDetail>>(

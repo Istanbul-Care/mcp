@@ -14,9 +14,9 @@ nothing to resolve against; the config says so next to each.
 
 ## Status
 
-Auth, the read side, authoring, SEO and translation are all in. Writes stay
-behind the `ICMCP_WRITE_PROJECTS` gate, so a brand nobody opted in cannot be
-touched.
+Auth, the read side, authoring, SEO and translation are all in. What a
+sign-in may change is decided by that account's role in the admin panel — the
+backend checks it on every call, and this server adds no second gate.
 
 ## Install
 
@@ -59,21 +59,18 @@ plainly when you ask it to touch a brand you have no account on; that needs an
 admin to add you, and no amount of retrying changes it.
 
 The token is cached at `~/.ic-content-mcp/sessions.json` (0600, in a 0700
-directory) so restarting does not cost you another code. `auth_status` shows
+directory) so restarting does not cost you another code. When the account
+needs no one-time code, the password you typed on the page is kept next to it
+(also 0600) and the server signs itself back in when the 24-hour token
+expires — so after the first sign-in there is no second one. `auth_status` shows
 what is live, `logout` drops it. `login_with_password` still exists for
 headless use, where there is no browser to open.
 
-## Writing
+## Permissions
 
-Reads need only a sign-in. **Writes additionally need the brand named in
-`ICMCP_WRITE_PROJECTS`** — a comma-separated list, empty by default, so a fresh
-install can read everything and change nothing:
-
-```
-claude mcp add ic-content -s user \
-  -e ICMCP_WRITE_PROJECTS=istanbul-care,luneste-clinic \
-  -- npx -y github:Istanbul-Care/mcp
-```
+There is no permission layer in this server. What you can read and change is
+exactly what your admin-panel role allows; the backend enforces that on every
+request, and a refusal from it is reported as such.
 
 Use your own account rather than a shared one. Every request the server makes
 is recorded in the backend's `activity_logs` with the user id, the endpoint and
@@ -97,36 +94,36 @@ agent is doing the writing.
 | `list_posts` | ✓ | Posts including drafts and scheduled |
 | `get_post` | ✓ | One post in full, all translations |
 | `seo_audit_post` | ✓ | The backend's SEO checks, split into blocking vs advisory |
-| `create_post_draft` / `update_post_translation` / `add_translation` / `set_post_metadata` | ✓* | Author a post (draft-first) |
-| `publish_post` / `unpublish_post` | ✓* | Go live (SEO-gated) / return to draft |
-| `auto_translate` / `_status` / `_rollback` | ✓* | Machine-translate one post, service or page |
+| `create_post_draft` / `update_post_translation` / `add_translation` / `set_post_metadata` | ✓ | Author a post (draft-first) |
+| `publish_post` / `unpublish_post` | ✓ | Go live (SEO-gated) / return to draft |
+| `auto_translate` / `_status` / `_rollback` | ✓ | Machine-translate one post, service or page |
 | `translation_coverage` | ✓ | What is untranslated, across all 32 surfaces |
-| `translate_everything` / `_status` | ✓* | Brand-wide sweep, throttled |
-| `translation_worklist` / `save_translations` | ✓* | The surfaces no backend endpoint translates |
-| `create_post_category` / `add_category_translation` | ✓* | Create/translate a category |
-| `create_tag` / `add_tag_translation` | ✓* | Create/translate a tag |
-| `list_post_faqs` / `add_post_faq` / `add_faq_translation` / `delete_faq` | ✓* | A post's FAQ block + FAQPage schema |
-| `list_seo_schemas` / `set_post_seo_schema` | ✓* | Structured data (JSON-LD) |
+| `translate_everything` / `_status` | ✓ | Brand-wide sweep, throttled |
+| `translation_worklist` / `save_translations` | ✓ | The surfaces no backend endpoint translates |
+| `create_post_category` / `add_category_translation` | ✓ | Create/translate a category |
+| `create_tag` / `add_tag_translation` | ✓ | Create/translate a tag |
+| `list_post_faqs` / `add_post_faq` / `add_faq_translation` / `delete_faq` | ✓ | A post's FAQ block + FAQPage schema |
+| `list_seo_schemas` / `set_post_seo_schema` | ✓ | Structured data (JSON-LD) |
 | `read_public_page` | – | A published page by slug path, with its real body HTML and full section payloads |
 | `list_pages` / `get_page` | ✓ | Pages with translations / one page's structure and SEO fields |
-| `create_page` / `update_page` | ✓* | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body |
-| `fold_page_cards` | ✓* | Move a page's prose cards into its `page_content` body, byte for byte (previews by default) |
-| `set_page_content` | ✓* | Write a page's body HTML for one language + enable/position the `page_content` block |
+| `create_page` / `update_page` | ✓ | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body |
+| `fold_page_cards` | ✓ | Move a page's prose cards into its `page_content` body, byte for byte (previews by default) |
+| `set_page_content` | ✓ | Write a page's body HTML for one language + enable/position the `page_content` block |
 | `get_card` / `get_page_cards` | ✓ | One card in full / a page's cards in render order, with their text and images |
 | `get_component` | ✓ | One hero/slider/package/footer/form in full, with every child id |
-| `update_hero` / `update_slider` / `update_process` / `update_price_compare` / `update_promotional_landing` / `update_before_after` | ✓* | Edit a component after it exists |
-| `create_hero_feature` / `create_slide` / `create_slide_feature` / `create_process_step` / `create_price_compare_country` / `create_promo_feature` / `create_gallery_item` | ✓* | Add one child row (each with `update_*` and `delete_*`) |
-| `create_package_section` / `create_offer` | ✓* | Build a pricing table tier by tier (price and currency are per-language) |
-| `list_links` / `create_link` / `update_link` / `delete_link` | ✓* | The reusable CTA buttons other blocks point at |
-| `create_header` / `update_header` / `delete_header` | ✓* | The nav shell the menu items hang off |
-| `list_footers` / `create_footer` / `create_footer_translation` / `create_footer_section` / `create_footer_item` | ✓* | A footer, then its columns **per language** |
-| `update_multi_page_form` / `create_form_page` / `create_form_field` / `create_form_option` | ✓* | The consultation wizard's steps, inputs and choices (steps are per-language) |
+| `update_hero` / `update_slider` / `update_process` / `update_price_compare` / `update_promotional_landing` / `update_before_after` | ✓ | Edit a component after it exists |
+| `create_hero_feature` / `create_slide` / `create_slide_feature` / `create_process_step` / `create_price_compare_country` / `create_promo_feature` / `create_gallery_item` | ✓ | Add one child row (each with `update_*` and `delete_*`) |
+| `create_package_section` / `create_offer` | ✓ | Build a pricing table tier by tier (price and currency are per-language) |
+| `list_links` / `create_link` / `update_link` / `delete_link` | ✓ | The reusable CTA buttons other blocks point at |
+| `create_header` / `update_header` / `delete_header` | ✓ | The nav shell the menu items hang off |
+| `list_footers` / `create_footer` / `create_footer_translation` / `create_footer_section` / `create_footer_item` | ✓ | A footer, then its columns **per language** |
+| `update_multi_page_form` / `create_form_page` / `create_form_field` / `create_form_option` | ✓ | The consultation wizard's steps, inputs and choices (steps are per-language) |
 | `list_form_submissions` | ✓ | The leads a form has collected |
-| `deactivate_*` / `restore_*` / `delete_*` (post, page, service) | ✓* | Reversible takedown, undo, and permanent removal |
-| `update_service` / `publish_service` / `unpublish_service` | ✓* | What posts already had, for services |
-| `bulk_update_posts` / `bulk_update_pages` / `bulk_update_services` | ✓* | Status and robots flags across a list of ids |
+| `deactivate_*` / `restore_*` / `delete_*` (post, page, service) | ✓ | Reversible takedown, undo, and permanent removal |
+| `update_service` / `publish_service` / `unpublish_service` | ✓ | What posts already had, for services |
+| `bulk_update_posts` / `bulk_update_pages` / `bulk_update_services` | ✓ | Status and robots flags across a list of ids |
 
-`✓` needs login. `✓*` also needs the brand in `ICMCP_WRITE_PROJECTS` (write gate).
+`✓` needs login.
 
 ## Turning a page's cards into its rich-text body
 

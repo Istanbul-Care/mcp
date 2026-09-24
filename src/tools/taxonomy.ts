@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { post } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
 import { coerceSlug } from "../lib/slug.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, guard, projectParam } from "./helpers.js";
 
 const slugField = z
   .string()
@@ -27,7 +27,7 @@ export function registerTaxonomyTools(server: McpServer): void {
       description:
         "Creates a new blog category in one language. Only use it when list_post_categories " +
         "shows the category you need does not exist. Add sibling-language names with " +
-        "add_category_translation. Requires login and a write-enabled brand.",
+        "add_category_translation. Requires login.",
       inputSchema: {
         project: projectParam,
         name: z.string().min(1).max(255),
@@ -45,8 +45,6 @@ export function registerTaxonomyTools(server: McpServer): void {
     },
     async ({ project, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const { slug, corrected } = coerceSlug(body.slug);
         body.slug = slug;
         const response = await post<Envelope<CreatedCategory>>(
@@ -68,8 +66,7 @@ export function registerTaxonomyTools(server: McpServer): void {
     {
       title: "Translate a blog category",
       description:
-        "Adds a name/slug for another language to an existing category. Requires login and a " +
-        "write-enabled brand.",
+        "Adds a name/slug for another language to an existing category. Requires login.",
       inputSchema: {
         project: projectParam,
         category_id: z.number().int(),
@@ -82,8 +79,6 @@ export function registerTaxonomyTools(server: McpServer): void {
     },
     async ({ project, category_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const { slug, corrected } = coerceSlug(body.slug);
         body.slug = slug;
         await post(project, `/admin/post-categories/${category_id}/translations`, body);
@@ -103,8 +98,7 @@ export function registerTaxonomyTools(server: McpServer): void {
       title: "Create a blog tag",
       description:
         "Creates a new blog tag in one language. Only use it when list_tags shows the tag " +
-        "does not exist. Add sibling-language names with add_tag_translation. Requires login " +
-        "and a write-enabled brand.",
+        "does not exist. Add sibling-language names with add_tag_translation. Requires login.",
       inputSchema: {
         project: projectParam,
         name: z.string().min(1).max(255),
@@ -119,8 +113,6 @@ export function registerTaxonomyTools(server: McpServer): void {
     },
     async ({ project, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const { slug, corrected } = coerceSlug(body.slug);
         body.slug = slug;
         const response = await post<Envelope<CreatedTag>>(project, "/admin/tags", body);
@@ -138,8 +130,7 @@ export function registerTaxonomyTools(server: McpServer): void {
     {
       title: "Translate a blog tag",
       description:
-        "Adds a name/slug for another language to an existing tag. Requires login and a " +
-        "write-enabled brand.",
+        "Adds a name/slug for another language to an existing tag. Requires login.",
       inputSchema: {
         project: projectParam,
         tag_id: z.number().int(),
@@ -151,8 +142,6 @@ export function registerTaxonomyTools(server: McpServer): void {
     },
     async ({ project, tag_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const { slug, corrected } = coerceSlug(body.slug);
         body.slug = slug;
         await post(project, `/admin/tags/${tag_id}/translations`, body);

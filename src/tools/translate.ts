@@ -50,7 +50,6 @@ import {
   fail,
   guard,
   projectParam,
-  ensureWritable,
   getActiveLanguageCodes,
   resolveLanguageIds,
 } from "./helpers.js";
@@ -389,7 +388,7 @@ export function registerTranslateTools(server: McpServer): void {
         "sizes, slugs come out ASCII. Returns a job id immediately — poll " +
         "auto_translate_status. By default only fills MISSING languages; set overwrite:true " +
         "to redo existing ones. For a whole brand at once use translate_everything. " +
-        "Requires login and a write-enabled brand.",
+        "Requires login.",
       inputSchema: {
         project: projectParam,
         entity_type: entityTypeParam,
@@ -422,8 +421,6 @@ export function registerTranslateTools(server: McpServer): void {
       translate_cards,
     }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const response = await startJob(
           project,
@@ -497,8 +494,7 @@ export function registerTranslateTools(server: McpServer): void {
       description:
         "Reverses an auto-translate run on one post, service or page: translations it " +
         "created are deleted, ones it overwrote are restored from the pre-run snapshot. Omit " +
-        "job_id for the latest run, or pass languages to roll back only some. Requires login " +
-        "and a write-enabled brand.",
+        "job_id for the latest run, or pass languages to roll back only some. Requires login.",
       inputSchema: {
         project: projectParam,
         entity_type: entityTypeParam,
@@ -510,8 +506,6 @@ export function registerTranslateTools(server: McpServer): void {
     },
     async ({ project, entity_type, entity_id, job_id, languages }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const response = await post<{ message: string }>(
           project,
@@ -728,8 +722,7 @@ export function registerTranslateTools(server: McpServer): void {
         "these in-process with no queue of its own, so they must be throttled from here. " +
         "Returns a batch id; poll translate_everything_status, which also starts the next " +
         "ones as slots free up. Content types with no machine-translation endpoint are " +
-        "reported, not started — use translation_worklist for those. Requires login and a " +
-        "write-enabled brand.",
+        "reported, not started — use translation_worklist for those. Requires login.",
       inputSchema: {
         project: projectParam,
         target_language_codes: z
@@ -781,8 +774,6 @@ export function registerTranslateTools(server: McpServer): void {
     }) =>
       guard(async () => {
         if (!dry_run) {
-          const blocked = ensureWritable(project);
-          if (blocked) return fail(blocked);
         }
 
         const source = (source_language_code ?? getProject(project).defaultLanguage).toLowerCase();
@@ -906,7 +897,7 @@ export function registerTranslateTools(server: McpServer): void {
         "Progress of a translate_everything batch. Each call reads the running jobs and " +
         "starts queued ones as slots free up, so poll it until finished:true — the sweep " +
         "does not advance on its own. Omit batch_id for the brand's latest batch. Requires " +
-        "login and a write-enabled brand.",
+        "login.",
       inputSchema: {
         project: projectParam,
         batch_id: z.string().optional(),
@@ -916,8 +907,6 @@ export function registerTranslateTools(server: McpServer): void {
     },
     async ({ project, batch_id, include_items }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const batch = getBatch(project, batch_id);
         if (!batch) {
@@ -1043,8 +1032,7 @@ export function registerTranslateTools(server: McpServer): void {
         "`fields` translated. Slugs are derived the way the backend derives them, internal " +
         "URLs are re-pointed at the target language, and non-prose columns (prices, icons, " +
         "phone numbers, social handles) are copied from the source row — do not send those. " +
-        "Creates the language row, or updates it if it already exists. Requires login and a " +
-        "write-enabled brand.",
+        "Creates the language row, or updates it if it already exists. Requires login.",
       inputSchema: {
         project: projectParam,
         language_code: z.string().min(2).describe("The language these translations are IN."),
@@ -1072,8 +1060,6 @@ export function registerTranslateTools(server: McpServer): void {
     },
     async ({ project, language_code, source_language_code, items, localize_urls }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const target = language_code.toLowerCase();
         const source = (source_language_code ?? getProject(project).defaultLanguage).toLowerCase();

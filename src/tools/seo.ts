@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { get, post, put, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, fail, guard, projectParam } from "./helpers.js";
 import { checkSchemaData, ensureFormats } from "../lib/field-formats.js";
 
 interface SeoSchemaListData {
@@ -89,7 +89,7 @@ export function registerSeoTools(server: McpServer): void {
         "default article schema for that post. schema_data is raw JSON-LD and may use the " +
         "backend's {{title}} / {{excerpt}} placeholders. Most posts do NOT need this — the " +
         "default article schema already covers them — so use it only when a post needs " +
-        "bespoke structured data. Requires login and a write-enabled brand.",
+        "bespoke structured data. Requires login.",
       inputSchema: {
         project: projectParam,
         post_id: z.number().int().describe("The post this schema is specific to."),
@@ -107,8 +107,6 @@ export function registerSeoTools(server: McpServer): void {
     },
     async ({ project, post_id, schema_data, language_id, name }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const badFormat = ensureFormats([checkSchemaData(schema_data)]);
         if (badFormat) return fail(badFormat);
         const response = await post<Envelope<CreatedSchema>>(
@@ -142,8 +140,7 @@ export function registerSeoTools(server: McpServer): void {
         "applies to (service/article/page). Set is_default to make it the fallback for every " +
         "item of that type; set is_specific + specific_id to bind it to one item. schema_data " +
         "is the raw JSON-LD object and may use the backend's {{title}} / {{excerpt}} " +
-        "placeholders. For a video block, prefer create_video_schema. Requires login and a " +
-        "write-enabled brand.",
+        "placeholders. For a video block, prefer create_video_schema. Requires login.",
       inputSchema: {
         project: projectParam,
         content_type: z
@@ -162,8 +159,6 @@ export function registerSeoTools(server: McpServer): void {
     },
     async ({ project, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const badFormat = ensureFormats([checkSchemaData(body.schema_data)]);
         if (badFormat) return fail(badFormat);
         const response = await post<Envelope<CreatedSchema>>(
@@ -184,7 +179,7 @@ export function registerSeoTools(server: McpServer): void {
         "no AI) and attaches it. Bind it to a page or service via content_type + specific_id, or " +
         "leave it as the default for the content_type. Google needs name, description, a " +
         "thumbnail URL and an upload date; give a content or embed URL too. duration_seconds is " +
-        "converted to the required ISO-8601 duration. Requires login and a write-enabled brand.",
+        "converted to the required ISO-8601 duration. Requires login.",
       inputSchema: {
         project: projectParam,
         content_type: z
@@ -209,8 +204,6 @@ export function registerSeoTools(server: McpServer): void {
     },
     async ({ project, content_type, specific_id, language_id, ...meta }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const schema_data = buildVideoObject(meta);
         const response = await post<Envelope<CreatedSchema>>(project, "/admin/seo-schemas", {
           content_type,
@@ -231,7 +224,7 @@ export function registerSeoTools(server: McpServer): void {
       title: "Update an SEO structured-data schema",
       description:
         "Edits an existing schema.org template. Pass only the fields that change; schema_data " +
-        "replaces the whole JSON-LD object. Requires login and a write-enabled brand.",
+        "replaces the whole JSON-LD object. Requires login.",
       inputSchema: {
         project: projectParam,
         schema_id: z.number().int(),
@@ -247,8 +240,6 @@ export function registerSeoTools(server: McpServer): void {
     },
     async ({ project, schema_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const badFormat = ensureFormats([checkSchemaData(body.schema_data)]);
         if (badFormat) return fail(badFormat);
         await put(project, `/admin/seo-schemas/${schema_id}`, body);
@@ -261,7 +252,7 @@ export function registerSeoTools(server: McpServer): void {
     {
       title: "Delete an SEO structured-data schema",
       description:
-        "Permanently removes a schema.org template. Requires login and a write-enabled brand.",
+        "Permanently removes a schema.org template. Requires login.",
       inputSchema: {
         project: projectParam,
         schema_id: z.number().int(),
@@ -270,8 +261,6 @@ export function registerSeoTools(server: McpServer): void {
     },
     async ({ project, schema_id }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await del(project, `/admin/seo-schemas/${schema_id}`);
         return ok({ project, schema_id, deleted: true });
       }),

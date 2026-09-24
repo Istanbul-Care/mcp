@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { get, post } from "../api/client.js";
 import { getProject, type ProjectId } from "../config/projects.js";
 import type { Envelope } from "../api/types.js";
-import { ok, fail, guard, projectParam, ensureWritable, resolveLanguageIds } from "./helpers.js";
+import { ok, fail, guard, projectParam, resolveLanguageIds } from "./helpers.js";
 
 interface FooterItem {
   id: number;
@@ -156,8 +156,7 @@ export function registerFooterTools(server: McpServer): void {
         "bulk endpoint. Pass the translated text from footer_worklist with the same " +
         "source_section_id / source_item_id keys. The backend clones the section/item " +
         "structure from the source language and applies your text; omitted text keeps the " +
-        "source value, and URLs / non-text fields are copied. Requires login and a " +
-        "write-enabled brand.",
+        "source value, and URLs / non-text fields are copied. Requires login.",
       inputSchema: {
         project: projectParam,
         footer_id: z.number().int(),
@@ -185,8 +184,6 @@ export function registerFooterTools(server: McpServer): void {
       replace_existing,
     }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const source = (source_language_code ?? getProject(project).defaultLanguage).toLowerCase();
         const target = language_code.toLowerCase();

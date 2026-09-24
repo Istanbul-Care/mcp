@@ -20,8 +20,8 @@ async function bootedTools() {
     command: process.execPath,
     args: ["dist/index.js"],
     cwd: repoRoot,
-    // No brand opted in: every write must refuse before it reaches the API.
-    env: { ...process.env, ICMCP_WRITE_PROJECTS: "" },
+    // No session and no stored credentials: a write must stop at auth.
+    env: { ...process.env, ICMCP_PERSIST_SESSIONS: "0", ICMCP_EMAIL: "", ICMCP_PASSWORD: "" },
   });
   const client = new Client({ name: "test", version: "1" }, { capabilities: {} });
   await client.connect(transport);
@@ -54,7 +54,7 @@ test("every tool says what it is for", async () => {
   }
 });
 
-test("a write refuses when no brand is opted in", async () => {
+test("a write with no sign-in stops at auth, not at some gate of its own", async () => {
   const { client } = await bootedTools();
   try {
     const result = await client.callTool({
@@ -62,11 +62,8 @@ test("a write refuses when no brand is opted in", async () => {
       arguments: { project: "istanbul-care", slide_id: 1 },
     });
     assert.equal(result.isError, true);
-    // Assert the behaviour, not the wording: it must refuse, say the block is
-    // local rather than an account permission, and hand over the fix.
-    assert.match(result.content[0].text, /read-only|nothing was changed/i);
-    assert.match(result.content[0].text, /ICMCP_WRITE_PROJECTS=istanbul-care/);
-    assert.match(result.content[0].text, /claude mcp add/);
+    assert.match(result.content[0].text, /Not authenticated|login/i);
+    assert.doesNotMatch(result.content[0].text, /ICMCP_WRITE_PROJECTS/);
   } finally {
     await client.close();
   }
@@ -85,7 +82,7 @@ test("a dropdown value the site cannot render is refused before the request", as
       },
     });
     assert.equal(result.isError, true);
-    // The write gate fires first with no brand opted in; either refusal is a
+    // With no sign-in the auth check fires first; either refusal is a
     // refusal, but the message must name the problem rather than 500 later.
     assert.ok(result.content[0].text.length > 20);
   } finally {

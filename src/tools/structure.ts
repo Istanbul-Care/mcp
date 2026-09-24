@@ -11,7 +11,7 @@
  * The admin API is regular here: a parent row, child collections hung off it,
  * and per-language translations on both. Each child collection gets the same
  * three tools (create / update / delete), and each write runs through
- * `registerWrite`, so the write gate and the dropdown validation are applied
+ * `registerWrite`, so the auth check and the dropdown validation are applied
  * the same way everywhere.
  *
  * Two shapes recur and are worth knowing before reading further:

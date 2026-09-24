@@ -16,7 +16,7 @@ import type { Envelope, LanguageInfo } from "../api/types.js";
 import { coerceSlug } from "../lib/slug.js";
 import type { ProjectId } from "../config/projects.js";
 import { fetchPageCards, type CardDetail, type CardTranslationDetail } from "./cards.js";
-import { ok, fail, guard, projectParam, ensureWritable, ensureVocabulary, resolveLanguageIds } from "./helpers.js";
+import { ok, fail, guard, projectParam, ensureVocabulary, resolveLanguageIds } from "./helpers.js";
 import { checkQueryParameters, ensureFormats } from "../lib/field-formats.js";
 
 interface PageTranslation {
@@ -415,7 +415,7 @@ export function registerPageTools(server: McpServer): void {
         "same call. Attach body sections (heroes, cards, sliders…) afterwards. The slug is " +
         "the bare leaf; the site composes the routable path from the brand's container " +
         "template and any parent page. Add other languages with the translation tools. " +
-        "Requires login and a write-enabled brand.",
+        "Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int().describe("Language of this first translation. See list_languages."),
@@ -447,8 +447,6 @@ export function registerPageTools(server: McpServer): void {
     },
     async ({ project, slug, ...rest }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const { slug: cleanSlug, corrected } = coerceSlug(slug);
         const response = await post<Envelope<PageDetail>>(project, "/admin/pages", {
@@ -478,8 +476,7 @@ export function registerPageTools(server: McpServer): void {
         "page's cards into its rich-text body: build the HTML from get_page_cards, save it " +
         "here per language, then detach the folded cards with update_page. The rest of the " +
         "translation (title, slug, SEO) is read first and re-sent unchanged, so only the " +
-        "body moves. The language row must already exist. Requires login and a " +
-        "write-enabled brand.",
+        "body moves. The language row must already exist. Requires login.",
       inputSchema: {
         project: projectParam,
         page_id: z.number().int(),
@@ -498,8 +495,6 @@ export function registerPageTools(server: McpServer): void {
     },
     async ({ project, page_id, language_code, content, page_content }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const code = language_code.toLowerCase();
         const languageId = (await resolveLanguageIds(project, [code])).get(code);
@@ -546,7 +541,7 @@ export function registerPageTools(server: McpServer): void {
         "own description, in render order — so nothing is rewritten, paraphrased or " +
         "translated. Widget cards (whatsapp, sliders, galleries, word clouds) are skipped " +
         "and stay on the page. Start with dry_run to see what each language would get. " +
-        "Requires login and a write-enabled brand.",
+        "Requires login.",
       inputSchema: {
         project: projectParam,
         page_id: z.number().int(),
@@ -592,8 +587,6 @@ export function registerPageTools(server: McpServer): void {
       page_content,
     }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const attached = await fetchPageCards(project, page_id);
         const wanted = card_ids ? new Set(card_ids) : null;
@@ -754,7 +747,7 @@ export function registerPageTools(server: McpServer): void {
         "sections you omit are left unchanged. To add or remove one item, read get_page for " +
         "the current ids first. Note that `order` is a single sequence across ALL section " +
         "types on the page, not per type: a hero at order 5 renders below a card at order 2. " +
-        "Requires login and a write-enabled brand.",
+        "Requires login.",
       inputSchema: {
         project: projectParam,
         page_id: z.number().int(),
@@ -826,8 +819,6 @@ export function registerPageTools(server: McpServer): void {
     },
     async ({ project, page_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const badValue = ensureVocabulary([["faq_style", body.page_faq?.style]]);
         if (badValue) return fail(badValue);
         const badFormat = ensureFormats([checkQueryParameters(body.blogs?.query_parameters)]);

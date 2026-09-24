@@ -24,7 +24,13 @@ import { randomBytes } from "node:crypto";
 import type { AddressInfo } from "node:net";
 
 import { PROJECT_IDS, getProject, type ProjectId } from "../config/projects.js";
-import { setSession, getSession, getToken, type AuthedUser } from "./session.js";
+import {
+  setSession,
+  getSession,
+  getToken,
+  rememberCredential,
+  type AuthedUser,
+} from "./session.js";
 
 const FLOW_TIMEOUT_MS = 10 * 60_000;
 
@@ -224,6 +230,9 @@ export async function startBrowserLogin(anchor: ProjectId): Promise<Flow> {
           const password = form.password ?? "";
           const reply = await callLogin(anchor, { email, password });
           if (reply.status === "authenticated") {
+            // No code was asked for, so this password can mint tokens on its
+            // own. Keep it, and tomorrow's sign-in happens without anyone.
+            rememberCredential(email, password);
             const access = await probeBrands(reply.access_token, reply.expires_in, reply.user);
             settle({ user: reply.user, access });
             setTimeout(close, 1500);

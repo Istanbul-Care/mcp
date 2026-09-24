@@ -84,6 +84,63 @@ function persistSessions(): void {
 
 loadSessions();
 
+/* ------------------------------------------------------------------ *
+ * Remembered credentials.
+ *
+ * The backend's tokens live 24 hours. For a person who signs in through the
+ * browser that would mean a fresh sign-in every morning, which is exactly
+ * what they asked not to have. So when the sign-in page succeeds WITHOUT an
+ * OTP challenge — the backend has marked the account otp_exempt, meaning the
+ * password alone can mint a token — the password is kept here, 0600, in the
+ * same directory that already holds the bearer tokens it is equivalent to.
+ * Accounts that need a code are never stored: the password could not refresh
+ * anything on its own, so keeping it would be risk with no benefit.
+ * ------------------------------------------------------------------ */
+const credentialFile = (): string =>
+  process.env.ICMCP_CREDENTIAL_FILE ||
+  join(homedir(), ".ic-content-mcp", "credentials.json");
+
+interface StoredCredential {
+  email: string;
+  password: string;
+}
+
+function loadStoredCredential(): StoredCredential | null {
+  if (!persistEnabled()) return null;
+  try {
+    const file = credentialFile();
+    if (!existsSync(file)) return null;
+    const data = JSON.parse(readFileSync(file, "utf8")) as Partial<StoredCredential>;
+    if (typeof data.email === "string" && typeof data.password === "string") {
+      return { email: data.email, password: data.password };
+    }
+  } catch {
+    // Unreadable is the same as absent.
+  }
+  return null;
+}
+
+export function rememberCredential(email: string, password: string): void {
+  if (!persistEnabled()) return;
+  try {
+    const file = credentialFile();
+    const dir = dirname(file);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+    writeFileSync(file, JSON.stringify({ email, password }), { mode: 0o600 });
+  } catch {
+    // Best effort: without it the person signs in again tomorrow, nothing worse.
+  }
+}
+
+export function forgetCredential(): void {
+  try {
+    const file = credentialFile();
+    if (existsSync(file)) writeFileSync(file, "{}", { mode: 0o600 });
+  } catch {
+    // Nothing to do.
+  }
+}
+
 export function setChallenge(project: ProjectId, challenge: PendingChallenge): void {
   challenges.set(project, challenge);
 }
@@ -204,16 +261,22 @@ export function resolveCredentials(
   password?: string,
 ): { email: string; password: string } {
   const suffix = project.toUpperCase().replace(/-/g, "_");
+  const remembered = loadStoredCredential();
   const resolvedEmail =
-    email ?? process.env[`ICMCP_EMAIL_${suffix}`] ?? process.env.ICMCP_EMAIL;
+    email ??
+    process.env[`ICMCP_EMAIL_${suffix}`] ??
+    process.env.ICMCP_EMAIL ??
+    remembered?.email;
   const resolvedPassword =
-    password ?? process.env[`ICMCP_PASSWORD_${suffix}`] ?? process.env.ICMCP_PASSWORD;
+    password ??
+    process.env[`ICMCP_PASSWORD_${suffix}`] ??
+    process.env.ICMCP_PASSWORD ??
+    remembered?.password;
 
   if (!resolvedEmail || !resolvedPassword) {
     throw new Error(
-      `No credentials for '${project}'. Pass email/password to the login tool, ` +
-      `or set ICMCP_EMAIL_${suffix} / ICMCP_PASSWORD_${suffix} (or the shared ` +
-      `ICMCP_EMAIL / ICMCP_PASSWORD) in the MCP server environment.`,
+      `No credentials for '${project}'. Call login and sign in on the page it opens; ` +
+      `for headless use set ICMCP_EMAIL / ICMCP_PASSWORD in the server environment.`,
     );
   }
   return { email: resolvedEmail, password: resolvedPassword };

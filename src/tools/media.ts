@@ -20,7 +20,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { get, postForm } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, fail, guard, projectParam } from "./helpers.js";
 
 interface MediaItem {
   id: number;
@@ -111,8 +111,7 @@ export function registerMediaTools(server: McpServer): void {
         "Uploads a local image file into a brand's media library and returns its id — use " +
         "that id as a post's featured_image_id or an in-page image. Converts to WebP by " +
         "default. Provide alt text in the brand's default language here; other languages are " +
-        "filled later via the translation tools (type 'media'). Requires login and a " +
-        "write-enabled brand.",
+        "filled later via the translation tools (type 'media'). Requires login.",
       inputSchema: {
         project: projectParam,
         file_path: z
@@ -129,8 +128,6 @@ export function registerMediaTools(server: McpServer): void {
     },
     async ({ project, file_path, alt, name, convert_to_webp }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         let bytes: Buffer;
         try {
@@ -165,8 +162,7 @@ export function registerMediaTools(server: McpServer): void {
       description:
         "Registers an external URL (e.g. a YouTube video, or an image already hosted " +
         "elsewhere) as a media item without downloading it. Returns the media id. For " +
-        "uploading a local image file, use upload_media instead. Requires login and a " +
-        "write-enabled brand.",
+        "uploading a local image file, use upload_media instead. Requires login.",
       inputSchema: {
         project: projectParam,
         external_url: z.string().url().describe("The external URL, e.g. a YouTube link."),
@@ -183,8 +179,6 @@ export function registerMediaTools(server: McpServer): void {
     },
     async ({ project, external_url, media_type, alt }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const form = new FormData();
         // The endpoint takes a JSON blob under the `request` multipart field.

@@ -11,7 +11,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { get, post, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
 import { getProject, type ProjectId } from "../config/projects.js";
-import { ok, fail, guard, projectParam, ensureWritable, resolveLanguageIds } from "./helpers.js";
+import { ok, guard, projectParam, resolveLanguageIds } from "./helpers.js";
 
 interface Created {
   id: number;
@@ -25,7 +25,7 @@ export function registerFormTools(server: McpServer): void {
       description:
         "Creates a contact form in ONE language, with its title, description, field labels and " +
         "submit button. Attach it to a page afterwards. Add other languages with the " +
-        "translation tools. Requires login and a write-enabled brand.",
+        "translation tools. Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int(),
@@ -49,8 +49,6 @@ export function registerFormTools(server: McpServer): void {
     },
     async ({ project, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const response = await post<Envelope<Created>>(project, "/admin/contact-form", body);
         return ok({ project, created: true, contact_form_id: response.data.id });
       }),
@@ -61,15 +59,12 @@ export function registerFormTools(server: McpServer): void {
     {
       title: "Delete a contact form",
       description:
-        "Permanently deletes a contact form (and its translations). Requires login and a " +
-        "write-enabled brand.",
+        "Permanently deletes a contact form (and its translations). Requires login.",
       inputSchema: { project: projectParam, contact_form_id: z.number().int() },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
     async ({ project, contact_form_id }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await del(project, `/admin/contact-form/${contact_form_id}`);
         return ok({ project, contact_form_id, deleted: true });
       }),
@@ -81,8 +76,7 @@ export function registerFormTools(server: McpServer): void {
       title: "Create a multi-step form",
       description:
         "Creates a multi-page lead form in ONE language (the chat-style customer-service " +
-        "widget). Add other languages with the translation tools. Requires login and a " +
-        "write-enabled brand.",
+        "widget). Add other languages with the translation tools. Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int(),
@@ -103,8 +97,6 @@ export function registerFormTools(server: McpServer): void {
     },
     async ({ project, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const response = await post<Envelope<Created>>(project, "/admin/multi-page-form", body);
         return ok({ project, created: true, multi_page_form_id: response.data.id });
       }),
@@ -115,15 +107,12 @@ export function registerFormTools(server: McpServer): void {
     {
       title: "Delete a multi-step form",
       description:
-        "Permanently deletes a multi-page form (and its translations). Requires login and a " +
-        "write-enabled brand.",
+        "Permanently deletes a multi-page form (and its translations). Requires login.",
       inputSchema: { project: projectParam, multi_page_form_id: z.number().int() },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
     async ({ project, multi_page_form_id }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await del(project, `/admin/multi-page-form/${multi_page_form_id}`);
         return ok({ project, multi_page_form_id, deleted: true });
       }),
@@ -219,7 +208,7 @@ export function registerFormTools(server: McpServer): void {
       description:
         "Creates the service-category dropdown options for one contact form in one language. " +
         "Pass the rows from contact_form_options_worklist with `name` translated and `code` / " +
-        "`sort_order` / `zapier_custom_id` unchanged. Requires login and a write-enabled brand.",
+        "`sort_order` / `zapier_custom_id` unchanged. Requires login.",
       inputSchema: {
         project: projectParam,
         contact_form_id: z.number().int(),
@@ -242,8 +231,6 @@ export function registerFormTools(server: McpServer): void {
     },
     async ({ project, contact_form_id, language_code, options }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const target = language_code.toLowerCase();
         const ids = await resolveLanguageIds(project, [target]);

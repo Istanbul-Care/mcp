@@ -9,7 +9,7 @@ import type {
   SeoAuditData,
 } from "../api/types.js";
 import { slugify, isValidSlug, auditSlug, coerceSlug } from "../lib/slug.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, guard, projectParam } from "./helpers.js";
 
 /** Blocking SEO checks — shared with posts. */
 const BLOCKING_CHECKS = new Set([
@@ -79,7 +79,7 @@ export function registerServiceTools(server: McpServer): void {
         "published. A service's body lives in its cards, so pass card_ids to attach existing " +
         "cards (or add them later). The slug is the bare leaf; the site composes the routable " +
         "path from the category chain. Add other languages with the translation tools. " +
-        "Requires login and a write-enabled brand.",
+        "Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int().describe("Language of this first translation. See list_languages."),
@@ -115,8 +115,6 @@ export function registerServiceTools(server: McpServer): void {
       ...translation
     }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const { slug: cleanSlug, corrected } = coerceSlug(translation.slug);
         translation.slug = cleanSlug;
@@ -240,7 +238,7 @@ export function registerServiceTools(server: McpServer): void {
       description:
         "Updates the fields of a single service translation (title, slug, meta, excerpt, " +
         "robots). Only pass what changes. Use it to correct an invalid slug found by " +
-        "audit_service. Requires login and a write-enabled brand.",
+        "audit_service. Requires login.",
       inputSchema: {
         project: projectParam,
         service_id: z.number().int(),
@@ -259,8 +257,6 @@ export function registerServiceTools(server: McpServer): void {
     },
     async ({ project, service_id, language_id, ...fields }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         let slugCorrected: string | undefined;
         if (fields.slug && !isValidSlug(fields.slug)) {

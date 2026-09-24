@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { checkVocabulary } from "../lib/vocabularies.js";
-import { PROJECT_IDS, isProjectId, type ProjectId } from "../config/projects.js";
+import { PROJECT_IDS, type ProjectId } from "../config/projects.js";
 import { get, post as apiPost, put as apiPut, del as apiDel } from "../api/client.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Envelope, LanguageListData, LanguageListItem } from "../api/types.js";
@@ -8,37 +8,6 @@ import type { Envelope, LanguageListData, LanguageListItem } from "../api/types.
 export const projectParam = z
   .enum(PROJECT_IDS as [ProjectId, ...ProjectId[]])
   .describe("Which brand to act on. Call list_projects to see them all.");
-
-export function writeAllowed(project: ProjectId): boolean {
-  return (process.env.ICMCP_WRITE_PROJECTS ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(isProjectId)
-    .includes(project);
-}
-
-export function ensureWritable(project: ProjectId): string | null {
-  if (writeAllowed(project)) return null;
-  // Whoever hits this is usually a content editor who has just been handed the
-  // server, so the message has to be the fix, not a description of the fix.
-  const current = (process.env.ICMCP_WRITE_PROJECTS ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-  const wanted = [...new Set([...current, project])].join(",");
-  return (
-    `This server is read-only for '${project}', so nothing was changed. That is a ` +
-    `setting on THIS computer, not a permission on your account — writes are off ` +
-    `by default so a fresh install cannot alter a brand by accident.\n\n` +
-    `To turn them on, run these two lines in a terminal and restart Claude:\n\n` +
-    `  claude mcp remove ic-content -s user\n` +
-    `  claude mcp add ic-content -s user -e ICMCP_WRITE_PROJECTS=${wanted} ` +
-    `-- npx -y github:Istanbul-Care/mcp\n\n` +
-    (current.length
-      ? `Currently writable: ${current.join(", ")}.`
-      : `Currently writable: nothing.`)
-  );
-}
 
 export interface ToolResult {
   [key: string]: unknown;
@@ -147,7 +116,7 @@ export function ensureVocabulary(
  * The admin API is a wide but very regular surface: each component has a
  * parent row, a handful of child collections, and per-language translations,
  * all reached by POST/PUT/DELETE on a predictable path. Writing each of those
- * out by hand is how tools drift apart — one forgets the write gate, another
+ * out by hand is how tools drift apart — one forgets the auth check, another
  * forgets to validate a dropdown value, a third returns a different shape.
  * Everything structural goes through `registerWrite` instead, so the gate,
  * the validation hook and the response shape are written once.
@@ -198,7 +167,7 @@ export function registerWrite(server: McpServer, spec: WriteSpec): void {
     spec.name,
     {
       title: spec.title,
-      description: `${spec.description} Requires login and a write-enabled brand.`,
+      description: `${spec.description} Requires login.`,
       inputSchema: { project: projectParam, ...(spec.params ?? {}) },
       annotations: {
         readOnlyHint: false,
@@ -209,8 +178,6 @@ export function registerWrite(server: McpServer, spec: WriteSpec): void {
     async (args: WriteArgs) =>
       guard(async () => {
         const project = args.project as ProjectId;
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const invalid = spec.checks?.(args);
         if (invalid) return fail(invalid);
 

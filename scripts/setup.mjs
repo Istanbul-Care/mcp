@@ -8,7 +8,7 @@
  * directory the Finder hides by default. This script writes that entry — and
  * only that entry, merging into whatever else is already configured.
  *
- *   npm run setup -- --email seo@istanbul-care.com --brands istanbul-care,luneste-clinic
+ *   npm run setup -- --email seo@istanbul-care.com
  *
  * The password is deliberately NOT a flag. It is prompted for, so it does not
  * land in the shell history, and it is stored only in the app's own config
@@ -64,7 +64,6 @@ async function main() {
   }
 
   const email = flag("email");
-  const brands = flag("brands");
   if (!email) {
     console.error(
       "Missing --email. Use YOUR OWN admin account, not a shared one: every write is\n" +
@@ -85,7 +84,6 @@ async function main() {
 
   const env = { ICMCP_EMAIL: email };
   if (password) env.ICMCP_PASSWORD = password;
-  if (brands && brands !== true) env.ICMCP_WRITE_PROJECTS = brands;
 
   const path = desktopConfigPath();
   mkdirSync(dirname(path), { recursive: true });
@@ -100,9 +98,6 @@ async function main() {
   console.log(`\n${existed ? "Updated" : "Added"} '${SERVER_NAME}' in ${path}`);
   console.log(`  account   ${email}`);
   console.log(`  password  ${password ? "stored in that file (locked to 0600)" : "not stored"}`);
-  console.log(
-    `  writing   ${env.ICMCP_WRITE_PROJECTS ?? "nothing — read-only until --brands is given"}`,
-  );
   console.log("\nQuit Claude Desktop completely and reopen it, then ask it to list_projects.");
   console.log("Using Claude Code instead? Run this and it is registered there too:\n");
   console.log(

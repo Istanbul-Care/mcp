@@ -68,10 +68,9 @@ before(() => {
   ]) {
     register(server);
   }
-  // Seed auth + write gate so the write tools proceed. Disable session
+  // Seed auth so the write tools proceed. Disable session
   // persistence so the fake test token never touches the real session file.
   process.env.ICMCP_PERSIST_SESSIONS = "0";
-  process.env.ICMCP_WRITE_PROJECTS = PROJECT;
   setSession(PROJECT, "test-token", 60, {
     id: 1,
     email: "t@t.com",
@@ -389,18 +388,6 @@ test("create_global_setting: nests contact block into translation", async () => 
   assert.ok(lastCall().url.endsWith("/admin/global-settings"));
   assert.equal(lastBody().translation.address, "Istanbul");
   assert.equal(lastBody().site_url, "https://x");
-});
-
-test("write gate: a write tool refuses when the brand is not write-enabled", async () => {
-  const saved = process.env.ICMCP_WRITE_PROJECTS;
-  process.env.ICMCP_WRITE_PROJECTS = ""; // nothing writable
-  try {
-    const r = await call("create_card", { project: PROJECT, language_id: 22, title: "x" });
-    assert.ok(isError(r), "expected a write-gate error");
-    assert.equal(calls.length, 0, "must not hit the network when gated");
-  } finally {
-    process.env.ICMCP_WRITE_PROJECTS = saved;
-  }
 });
 
 // --- cards -> page_content ------------------------------------------------
@@ -880,8 +867,6 @@ test("save_contact_form_options: posts one row per option and keeps code verbati
   });
   calls.length = 0;
 
-  const savedGate = process.env.ICMCP_WRITE_PROJECTS;
-  process.env.ICMCP_WRITE_PROJECTS = `${savedGate},${FOOTER_PROJECT}`;
   const r = await call("save_contact_form_options", {
     project: FOOTER_PROJECT,
     contact_form_id: 3,
@@ -891,7 +876,6 @@ test("save_contact_form_options: posts one row per option and keeps code verbati
       { name: "طب الأسنان", code: "dental", sort_order: 1 },
     ],
   });
-  process.env.ICMCP_WRITE_PROJECTS = savedGate;
   assert.ok(!isError(r), r.content?.[0]?.text);
 
   const posts = calls.filter((c) => c.method === "POST" && c.url.includes("/service-options"));

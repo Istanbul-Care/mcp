@@ -10,8 +10,8 @@ slug or an internal URL by hand — call generate_slug and resolve_internal_link
 1. Know the brand: call get_brand_guide({project}) for audience, tone, linking
    targets and compliance rules. Do not invent clinical facts, prices, or
    guarantees.
-2. Confirm write access: writes only work on brands in ICMCP_WRITE_PROJECTS.
-3. Log in: login({project}) -> ask the human for the e-mailed code -> submit_otp.
+2. Sign in: login() returns a URL — give it to the person; they sign in on that page.
+   What you may change is whatever their admin-panel role allows; the backend checks every call.
 4. Research: search_content to avoid duplicates and find internal-link targets;
    list_post_categories / list_tags for ids (create_post_category / create_tag if
    missing); list_languages for language ids.

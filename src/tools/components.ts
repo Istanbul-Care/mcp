@@ -8,7 +8,7 @@
  * these tools create/update/delete the components themselves. Nested children
  * (slides, features, offers, steps, …) are passed inline at create time; edit
  * them by re-sending the parent's child array on update where the API supports
- * it. Each write needs login + a write-enabled brand.
+ * it. Each write needs login.
  */
 
 import { z } from "zod";
@@ -16,7 +16,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { get, post, put, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
-import { ok, fail, guard, projectParam, ensureWritable, ensureVocabulary } from "./helpers.js";
+import { ok, fail, guard, projectParam, ensureVocabulary } from "./helpers.js";
 
 /**
  * Create responses come in two shapes: most wrap the new row under `data`
@@ -35,8 +35,6 @@ async function createEntity(
   body: unknown,
   vocabulary: Array<[string, unknown]> = [],
 ): Promise<ReturnType<typeof ok>> {
-  const blocked = ensureWritable(project as never);
-  if (blocked) return fail(blocked);
   // Style/type fields are free strings in the database; a value the site has
   // no branch for renders as something else with no error anywhere.
   const badValue = ensureVocabulary(vocabulary);
@@ -116,7 +114,7 @@ function registerListDelete(
     `delete_${entity}`,
     {
       title: `Delete a ${label.replace(/s$/, "")}`,
-      description: `Permanently removes one of the ${label}. Requires login and a write-enabled brand.`,
+      description: `Permanently removes one of the ${label}. Requires login.`,
       inputSchema: {
         project: projectParam,
         [idParam]: z.number().int(),
@@ -126,8 +124,6 @@ function registerListDelete(
     async (args) =>
       guard(async () => {
         const project = args.project;
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await del(project, `/admin/${collection}/${args[idParam]}`);
         return ok({ project, [idParam]: args[idParam], deleted: true });
       }),
@@ -148,7 +144,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Create a URL redirect",
       description:
         "Adds a source→target URL redirect for a brand. Use relative paths (e.g. /old-page). " +
-        "Requires login and a write-enabled brand.",
+        "Requires login.",
       inputSchema: {
         project: projectParam,
         source_url: z.string().describe("The old/incoming path, e.g. /old-slug."),
@@ -164,7 +160,7 @@ export function registerComponentTools(server: McpServer): void {
     "update_redirect",
     {
       title: "Update a URL redirect",
-      description: "Edits an existing redirect. Pass only what changes. Requires login and a write-enabled brand.",
+      description: "Edits an existing redirect. Pass only what changes. Requires login.",
       inputSchema: {
         project: projectParam,
         redirect_id: z.number().int(),
@@ -176,8 +172,6 @@ export function registerComponentTools(server: McpServer): void {
     },
     async ({ project, redirect_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await put(project, `/admin/redirects/${redirect_id}`, body);
         return ok({ project, redirect_id, updated: true });
       }),
@@ -196,7 +190,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Create a map/contact section",
       description:
         "Creates a Google-map + contact block (map embed, phone, e-mail, social id) with its " +
-        "first-language text. Requires login and a write-enabled brand.",
+        "first-language text. Requires login.",
       inputSchema: {
         project: projectParam,
         googlemap_url: z.string().describe("The map embed URL."),
@@ -227,7 +221,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Update a map/contact section",
       description:
         "Edits the map/contact fields (not the translated text — use the translate tools for that). " +
-        "Pass only what changes. Requires login and a write-enabled brand.",
+        "Pass only what changes. Requires login.",
       inputSchema: {
         project: projectParam,
         google_map_section_id: z.number().int(),
@@ -241,8 +235,6 @@ export function registerComponentTools(server: McpServer): void {
     },
     async ({ project, google_map_section_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await put(project, `/admin/google-map-sections/${google_map_section_id}`, body);
         return ok({ project, google_map_section_id, updated: true });
       }),
@@ -264,7 +256,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Create a hero banner",
       description:
         "Creates a page hero (the big top banner) with its first-language text, optional " +
-        "background image and inline feature cards / icons. Requires login and a write-enabled brand.",
+        "background image and inline feature cards / icons. Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int(),
@@ -330,7 +322,7 @@ export function registerComponentTools(server: McpServer): void {
       description:
         "Creates a slider (carousel) and, optionally, its slides inline. Each slide needs a type " +
         "and a translation { title*, subtitle?, description?, cta_text?, cta_url?, language_id }; " +
-        "slides may carry feature stats. Requires login and a write-enabled brand.",
+        "slides may carry feature stats. Requires login.",
       inputSchema: {
         project: projectParam,
         name: z.string().optional(),
@@ -359,7 +351,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Create a process section",
       description:
         "Creates a 'how it works' process block with its first-language text and optional numbered " +
-        "steps. Requires login and a write-enabled brand.",
+        "steps. Requires login.",
       inputSchema: {
         project: projectParam,
         title: z.string(),
@@ -388,7 +380,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Create a package",
       description:
         "Creates a pricing package with its first-language title and optional sections/offers. " +
-        "Requires login and a write-enabled brand.",
+        "Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int(),
@@ -418,7 +410,7 @@ export function registerComponentTools(server: McpServer): void {
     {
       title: "Update a package",
       description:
-        "Edits a package's price / featured flag. Pass only what changes. Requires login and a write-enabled brand.",
+        "Edits a package's price / featured flag. Pass only what changes. Requires login.",
       inputSchema: {
         project: projectParam,
         package_id: z.number().int(),
@@ -429,8 +421,6 @@ export function registerComponentTools(server: McpServer): void {
     },
     async ({ project, package_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await put(project, `/admin/packages/${package_id}`, body);
         return ok({ project, package_id, updated: true });
       }),
@@ -449,7 +439,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Create a price-comparison section",
       description:
         "Creates a price-comparison block with its first-language titles. Add per-country rows " +
-        "afterwards. Requires login and a write-enabled brand.",
+        "afterwards. Requires login.",
       inputSchema: {
         project: projectParam,
         main_title: z.string(),
@@ -478,7 +468,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Create a promotional landing block",
       description:
         "Creates a promotional landing section with its first-language text, optional background/" +
-        "video and a gallery. Requires login and a write-enabled brand.",
+        "video and a gallery. Requires login.",
       inputSchema: {
         project: projectParam,
         title: z.string(),
@@ -511,8 +501,7 @@ export function registerComponentTools(server: McpServer): void {
     {
       title: "Create a before/after gallery",
       description:
-        "Creates a before/after gallery block with optional inline image pairs. Requires login " +
-        "and a write-enabled brand.",
+        "Creates a before/after gallery block with optional inline image pairs. Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int().optional(),
@@ -550,7 +539,7 @@ export function registerComponentTools(server: McpServer): void {
         "Creates the site-wide settings record: robots.txt / llms.txt content, canonical site " +
         "URL, brand code/name, header & footer scripts, favicon, feature flags, plus the " +
         "first-language contact/social block. A brand usually has exactly one — prefer " +
-        "update_global_setting if one already exists. Requires login and a write-enabled brand.",
+        "update_global_setting if one already exists. Requires login.",
       inputSchema: {
         project: projectParam,
         robots_txt_content: z.string(),
@@ -588,7 +577,7 @@ export function registerComponentTools(server: McpServer): void {
       description:
         "Edits the site-wide settings (robots/llms.txt, site URL, scripts, favicon, flags). Pass " +
         "only what changes; the contact/social text is per-language — use the translate tools. " +
-        "Requires login and a write-enabled brand.",
+        "Requires login.",
       inputSchema: {
         project: projectParam,
         setting_id: z.number().int(),
@@ -608,8 +597,6 @@ export function registerComponentTools(server: McpServer): void {
     },
     async ({ project, setting_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await put(project, `/admin/global-settings/${setting_id}`, body);
         return ok({ project, setting_id, updated: true });
       }),

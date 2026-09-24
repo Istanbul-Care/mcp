@@ -12,7 +12,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { get, post, put, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
-import { ok, fail, guard, projectParam, ensureWritable, ensureVocabulary } from "./helpers.js";
+import { ok, fail, guard, projectParam, ensureVocabulary } from "./helpers.js";
 
 interface HeaderListItem {
   id: number;
@@ -66,7 +66,7 @@ export function registerHeaderTools(server: McpServer): void {
       description:
         "Adds a menu item to a header, with its label and link in ONE language. Nest under " +
         "another item with parent_id (for dropdowns). Add other languages with the " +
-        "translation tools (type 'header_item'). Requires login and a write-enabled brand.",
+        "translation tools (type 'header_item'). Requires login.",
       inputSchema: {
         project: projectParam,
         header_id: z.number().int().describe("From list_headers."),
@@ -96,8 +96,6 @@ export function registerHeaderTools(server: McpServer): void {
     },
     async ({ project, header_id, language_id, label, url, item_type, parent_id, order, is_active }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const badValue = ensureVocabulary([["header_item_type", item_type]]);
         if (badValue) return fail(badValue);
         const response = await post<Envelope<CreatedItem>>(
@@ -121,8 +119,7 @@ export function registerHeaderTools(server: McpServer): void {
       title: "Edit a navbar item's structure",
       description:
         "Updates a menu item's structure — its type, order, active flag or parent. Text " +
-        "(label/url) is per-language: change it with the translation tools. Requires login " +
-        "and a write-enabled brand.",
+        "(label/url) is per-language: change it with the translation tools. Requires login.",
       inputSchema: {
         project: projectParam,
         header_id: z.number().int(),
@@ -136,8 +133,6 @@ export function registerHeaderTools(server: McpServer): void {
     },
     async ({ project, header_id, item_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await put(project, `/admin/headers/${header_id}/items/${item_id}`, body);
         return ok({ project, header_id, item_id, updated: true });
       }),
@@ -149,7 +144,7 @@ export function registerHeaderTools(server: McpServer): void {
       title: "Remove a navbar item",
       description:
         "Permanently removes a menu item (and its translations and any child items). Requires " +
-        "login and a write-enabled brand.",
+        "login.",
       inputSchema: {
         project: projectParam,
         header_id: z.number().int(),
@@ -159,8 +154,6 @@ export function registerHeaderTools(server: McpServer): void {
     },
     async ({ project, header_id, item_id }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await del(project, `/admin/headers/${header_id}/items/${item_id}`);
         return ok({ project, header_id, item_id, deleted: true });
       }),

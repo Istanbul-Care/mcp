@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { get, post, request } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, guard, projectParam } from "./helpers.js";
 
 interface CreatedFaq {
   id: number;
@@ -70,7 +70,7 @@ export function registerFaqTools(server: McpServer): void {
       description:
         "Creates one question/answer bound to a blog post, in a single language. Call it once " +
         "per FAQ; add other languages with add_faq_translation. The FAQ feeds both the on-page " +
-        "block and the post's FAQPage structured data. Requires login and a write-enabled brand.",
+        "block and the post's FAQPage structured data. Requires login.",
       inputSchema: {
         project: projectParam,
         post_id: z.number().int().describe("The owning post."),
@@ -87,8 +87,6 @@ export function registerFaqTools(server: McpServer): void {
     },
     async ({ project, post_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const response = await post<Envelope<CreatedFaq>>(project, "/admin/faqs", {
           owner_type: "post",
           owner_id: post_id,
@@ -103,8 +101,7 @@ export function registerFaqTools(server: McpServer): void {
     {
       title: "Translate an FAQ",
       description:
-        "Adds a question/answer for another language to an existing FAQ. Requires login and a " +
-        "write-enabled brand.",
+        "Adds a question/answer for another language to an existing FAQ. Requires login.",
       inputSchema: {
         project: projectParam,
         faq_id: z.number().int(),
@@ -116,8 +113,6 @@ export function registerFaqTools(server: McpServer): void {
     },
     async ({ project, faq_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await post(project, `/admin/faqs/${faq_id}/translations`, body);
         return ok({ project, faq_id, language_id: body.language_id, added: true });
       }),
@@ -128,15 +123,12 @@ export function registerFaqTools(server: McpServer): void {
     {
       title: "Delete an FAQ",
       description:
-        "Removes an FAQ (all its languages) from its post. Requires login and a write-enabled " +
-        "brand.",
+        "Removes an FAQ (all its languages) from its post. Requires login.",
       inputSchema: { project: projectParam, faq_id: z.number().int() },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
     async ({ project, faq_id }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await request(project, "DELETE", `/admin/faqs/${faq_id}`);
         return ok({ project, faq_id, deleted: true });
       }),

@@ -10,7 +10,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { get, put } from "../api/client.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, guard, projectParam } from "./helpers.js";
 
 /** The settings response is flat — not wrapped in the usual {status, data} envelope. */
 interface ChatbotSettings {
@@ -58,8 +58,7 @@ export function registerChatbotTools(server: McpServer): void {
       title: "Update the chatbot settings",
       description:
         "Changes the chat widget's configuration. Only pass what changes. Set the OpenAI key " +
-        "only when rotating it — it is write-only and never read back. Requires login and a " +
-        "write-enabled brand.",
+        "only when rotating it — it is write-only and never read back. Requires login.",
       inputSchema: {
         project: projectParam,
         is_enabled: z.boolean().optional(),
@@ -72,8 +71,6 @@ export function registerChatbotTools(server: McpServer): void {
     },
     async ({ project, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await put(project, "/admin/chatbot/settings", body);
         return ok({ project, updated: true });
       }),

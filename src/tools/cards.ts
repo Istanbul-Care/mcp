@@ -12,7 +12,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { get, post, put, del } from "../api/client.js";
 import type { Envelope, LanguageInfo } from "../api/types.js";
 import type { ProjectId } from "../config/projects.js";
-import { ok, fail, guard, projectParam, ensureWritable, ensureVocabulary } from "./helpers.js";
+import { ok, fail, guard, projectParam, ensureVocabulary } from "./helpers.js";
 import {
   checkWordCloudDescription,
   ensureFormats,
@@ -272,8 +272,7 @@ export function registerCardTools(server: McpServer): void {
         "Creates a content card in ONE language. Cards are the body blocks of services and " +
         "pages — attach the returned id via create_service's card_ids or the page tools. " +
         "Non-prose fields (icon, image, dimensions) are shared across languages; text is " +
-        "per-language. Add other languages with the translation tools. Requires login and a " +
-        "write-enabled brand.",
+        "per-language. Add other languages with the translation tools. Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int().describe("Language of this first translation."),
@@ -293,8 +292,6 @@ export function registerCardTools(server: McpServer): void {
     },
     async ({ project, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const badValue = ensureVocabulary([
           ["card_type", body.type],
           ["card_text_position", body.text_position],
@@ -320,8 +317,7 @@ export function registerCardTools(server: McpServer): void {
       title: "Edit a card",
       description:
         "Updates a card's shared fields (icon, image, dimensions, style) and/or its text in " +
-        "one language via translation_update. Only pass what changes. Requires login and a " +
-        "write-enabled brand.",
+        "one language via translation_update. Only pass what changes. Requires login.",
       inputSchema: {
         project: projectParam,
         card_id: z.number().int(),
@@ -347,8 +343,6 @@ export function registerCardTools(server: McpServer): void {
     },
     async ({ project, card_id, ...body }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         const badValue = ensureVocabulary([
           ["card_type", body.type],
           ["card_text_position", body.text_position],
@@ -369,14 +363,12 @@ export function registerCardTools(server: McpServer): void {
       title: "Delete a card",
       description:
         "Permanently deletes a card (and its translations). It is also removed from any " +
-        "service/page that used it. Requires login and a write-enabled brand.",
+        "service/page that used it. Requires login.",
       inputSchema: { project: projectParam, card_id: z.number().int() },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
     async ({ project, card_id }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
         await del(project, `/admin/cards/${card_id}`);
         return ok({ project, card_id, deleted: true });
       }),

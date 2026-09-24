@@ -5,7 +5,7 @@ import { get, post, put } from "../api/client.js";
 import type { Envelope, PostDetail, SeoAuditData } from "../api/types.js";
 import { getSession } from "../auth/session.js";
 import { coerceSlug } from "../lib/slug.js";
-import { ok, fail, guard, projectParam, ensureWritable } from "./helpers.js";
+import { ok, fail, guard, projectParam } from "./helpers.js";
 
 const BLOCKING_CHECKS = new Set([
   "focus_in_seo_title",
@@ -51,8 +51,7 @@ export function registerAuthoringTools(server: McpServer): void {
         "Creates a new blog post in ONE language as a draft. It never publishes — status is " +
         "always 'draft', so the post is invisible on the public site until publish_post is " +
         "called. Add other languages with add_translation or auto_translate. The slug " +
-        "is the bare leaf (no /blog/ prefix); the site composes the routable path. Requires " +
-        "login and that the brand is write-enabled.",
+        "is the bare leaf (no /blog/ prefix); the site composes the routable path. Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z
@@ -80,8 +79,6 @@ export function registerAuthoringTools(server: McpServer): void {
     },
     async ({ project, language_id, featured_image_id, banner_image_id, category_ids, tag_ids, author_id, reviewer_id, allow_comments, ...translation }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const resolvedAuthorId = author_id ?? getSession(project)?.user.id;
 
@@ -123,7 +120,7 @@ export function registerAuthoringTools(server: McpServer): void {
       description:
         "Adds one more language translation to an existing post. Use for hand-written " +
         "translations; for machine translation use auto_translate instead. Requires " +
-        "login and a write-enabled brand.",
+        "login.",
       inputSchema: {
         project: projectParam,
         post_id: z.number().int(),
@@ -134,8 +131,6 @@ export function registerAuthoringTools(server: McpServer): void {
     },
     async ({ project, post_id, language_id, ...translation }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         const { slug: cleanSlug, corrected } = coerceSlug(translation.slug);
         translation.slug = cleanSlug;
@@ -160,8 +155,7 @@ export function registerAuthoringTools(server: McpServer): void {
       title: "Edit one translation of a post",
       description:
         "Updates the fields of a single existing translation. Only pass what changes — " +
-        "omitted fields are left as-is. Does not change publish status. Requires login and a " +
-        "write-enabled brand.",
+        "omitted fields are left as-is. Does not change publish status. Requires login.",
       inputSchema: {
         project: projectParam,
         post_id: z.number().int(),
@@ -182,8 +176,6 @@ export function registerAuthoringTools(server: McpServer): void {
     },
     async ({ project, post_id, language_id, ...fields }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         let slugCorrected: string | undefined;
         if (fields.slug !== undefined) {
@@ -214,8 +206,7 @@ export function registerAuthoringTools(server: McpServer): void {
       description:
         "Updates the post-level (not per-translation) fields: categories, tags, related " +
         "posts, images, author, reviewer. Arrays REPLACE the existing set — pass the full " +
-        "list, or an empty array to clear. Does not change publish status. Requires login " +
-        "and a write-enabled brand.",
+        "list, or an empty array to clear. Does not change publish status. Requires login.",
       inputSchema: {
         project: projectParam,
         post_id: z.number().int(),
@@ -235,8 +226,6 @@ export function registerAuthoringTools(server: McpServer): void {
     },
     async ({ project, post_id, ...fields }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         await put(project, `/admin/posts/${post_id}`, fields);
         return ok({ project, post_id, updated: true });
@@ -251,8 +240,7 @@ export function registerAuthoringTools(server: McpServer): void {
         "Takes a draft live. Before flipping status it runs the SEO audit and REFUSES if any " +
         "blocking check fails, so a thin or broken post cannot reach the public site. Pass " +
         "force:true to publish anyway (records why in the response). To schedule instead of " +
-        "publishing now, pass scheduled_at as an ISO timestamp. Requires login and a " +
-        "write-enabled brand.",
+        "publishing now, pass scheduled_at as an ISO timestamp. Requires login.",
       inputSchema: {
         project: projectParam,
         post_id: z.number().int(),
@@ -269,8 +257,6 @@ export function registerAuthoringTools(server: McpServer): void {
     },
     async ({ project, post_id, scheduled_at, force }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         let auditSummary: unknown = "skipped (force=true)";
         if (!force) {
@@ -330,14 +316,12 @@ export function registerAuthoringTools(server: McpServer): void {
       description:
         "Flips a published or scheduled post back to draft, removing it from the public " +
         "site without deleting it. The reversible counterpart to publish_post. Requires " +
-        "login and a write-enabled brand.",
+        "login.",
       inputSchema: { project: projectParam, post_id: z.number().int() },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
     async ({ project, post_id }) =>
       guard(async () => {
-        const blocked = ensureWritable(project);
-        if (blocked) return fail(blocked);
 
         await put(project, `/admin/posts/${post_id}`, { status: "draft" });
         return ok({ project, post_id, status: "draft", unpublished: true });
