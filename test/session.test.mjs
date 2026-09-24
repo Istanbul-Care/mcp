@@ -49,3 +49,18 @@ test("an expired session is not lent out", () => {
   setSession("istanbul-care", "tok-stale", -1, USER);
   assert.equal(getToken("luneste-clinic"), null);
 });
+
+test("a signed-in session lasts the day, not the hour", async () => {
+  // expires_in comes back as MINUTES (1440) and setSession takes minutes.
+  // Treating it as seconds once cost every session 23 of its 24 hours, which
+  // reads to the user as "it keeps logging me out".
+  const { describeSessions } = await import("../dist/auth/session.js");
+  clearSession("istanbul-care");
+  setSession("istanbul-care", "tok", 1440, USER);
+  const row = describeSessions().find((r) => r.project === "istanbul-care");
+  assert.ok(
+    row.minutesRemaining > 1400,
+    `expected ~24h, got ${row.minutesRemaining} minutes`,
+  );
+  clearSession("istanbul-care");
+});

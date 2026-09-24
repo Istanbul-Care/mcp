@@ -19,10 +19,24 @@ export function writeAllowed(project: ProjectId): boolean {
 
 export function ensureWritable(project: ProjectId): string | null {
   if (writeAllowed(project)) return null;
+  // Whoever hits this is usually a content editor who has just been handed the
+  // server, so the message has to be the fix, not a description of the fix.
+  const current = (process.env.ICMCP_WRITE_PROJECTS ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const wanted = [...new Set([...current, project])].join(",");
   return (
-    `Writes to '${project}' are disabled. Add it to the ICMCP_WRITE_PROJECTS ` +
-    `environment variable (comma-separated) and restart the server. This is the ` +
-    `safety gate that stops the robot from touching a brand nobody opted in.`
+    `This server is read-only for '${project}', so nothing was changed. That is a ` +
+    `setting on THIS computer, not a permission on your account — writes are off ` +
+    `by default so a fresh install cannot alter a brand by accident.\n\n` +
+    `To turn them on, run these two lines in a terminal and restart Claude:\n\n` +
+    `  claude mcp remove ic-content -s user\n` +
+    `  claude mcp add ic-content -s user -e ICMCP_WRITE_PROJECTS=${wanted} ` +
+    `-- npx -y github:Istanbul-Care/mcp\n\n` +
+    (current.length
+      ? `Currently writable: ${current.join(", ")}.`
+      : `Currently writable: nothing.`)
   );
 }
 

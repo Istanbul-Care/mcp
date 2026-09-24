@@ -103,11 +103,11 @@ async function callLogin(project: ProjectId, body: unknown): Promise<LoginReply>
  */
 async function probeBrands(
   token: string,
-  expiresIn: number,
+  expiresInMinutes: number,
   user: AuthedUser,
 ): Promise<BrandAccess[]> {
   return Promise.all(
-    PROJECT_IDS.map((project) => probeOne(project, token, expiresIn, user)),
+    PROJECT_IDS.map((project) => probeOne(project, token, expiresInMinutes, user)),
   );
 }
 
@@ -127,7 +127,7 @@ async function probeBrands(
 async function probeOne(
   project: ProjectId,
   token: string,
-  expiresIn: number,
+  expiresInMinutes: number,
   user: AuthedUser,
   attempt = 1,
 ): Promise<BrandAccess> {
@@ -140,7 +140,7 @@ async function probeOne(
     });
 
     if (response.ok) {
-      setSession(project, token, expiresIn / 60, user);
+      setSession(project, token, expiresInMinutes, user);
       const role = await roleOn(base, token);
       return { project, access: "yes", ...(role ? { role } : {}) };
     }
@@ -151,10 +151,10 @@ async function probeOne(
     }
 
     // Anything else is the check failing, not permission being refused.
-    if (attempt === 1) return probeOne(project, token, expiresIn, user, 2);
+    if (attempt === 1) return probeOne(project, token, expiresInMinutes, user, 2);
     return { project, access: "unknown", detail: `the brand answered ${response.status}` };
   } catch (error) {
-    if (attempt === 1) return probeOne(project, token, expiresIn, user, 2);
+    if (attempt === 1) return probeOne(project, token, expiresInMinutes, user, 2);
     const reason = error instanceof Error ? error.message : String(error);
     return { project, access: "unknown", detail: `could not reach it (${reason})` };
   }

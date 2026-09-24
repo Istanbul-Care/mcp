@@ -1,5 +1,6 @@
 import { getProject, type ProjectId } from "../config/projects.js";
 import { getToken } from "../auth/session.js";
+import { canRefresh, refreshToken } from "../auth/refresh.js";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -119,12 +120,27 @@ export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  return requestOnce<T>(project, method, path, options, true);
+}
+
+async function requestOnce<T>(
+  project: ProjectId,
+  method: "GET" | "POST" | "PUT" | "DELETE",
+  path: string,
+  options: RequestOptions,
+  mayRefresh: boolean,
+): Promise<T> {
   const { query, body, auth = true, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const url = buildUrl(project, path, query);
 
   const headers: Record<string, string> = { Accept: "application/json" };
   if (auth) {
-    const token = getToken(project);
+    let token = getToken(project);
+    // No token at all is still worth a refresh attempt: the process may have
+    // restarted since the last sign-in, which is the ordinary morning case.
+    if (!token && mayRefresh && canRefresh(project)) {
+      token = await refreshToken(project);
+    }
     if (!token) throw new AuthRequiredError(project);
     headers.Authorization = `Bearer ${token}`;
   }
@@ -144,6 +160,11 @@ export async function request<T>(
     // A 401 on an authenticated call means the JWT died mid-session; say so in
     // the terms the agent needs rather than leaking a bare "Not authenticated".
     if (response.status === 401 && auth) {
+      // The 24-hour token expired mid-session. Mint another and retry once,
+      // so a day-long editing session does not stop at midnight.
+      if (mayRefresh && (await refreshToken(project))) {
+        return requestOnce<T>(project, method, path, options, false);
+      }
       throw new AuthRequiredError(project);
     }
     const detail = await extractDetail(response);
