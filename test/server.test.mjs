@@ -62,7 +62,11 @@ test("a write refuses when no brand is opted in", async () => {
       arguments: { project: "istanbul-care", slide_id: 1 },
     });
     assert.equal(result.isError, true);
-    assert.match(result.content[0].text, /disabled/);
+    // Assert the behaviour, not the wording: it must refuse, say the block is
+    // local rather than an account permission, and hand over the fix.
+    assert.match(result.content[0].text, /read-only|nothing was changed/i);
+    assert.match(result.content[0].text, /ICMCP_WRITE_PROJECTS=istanbul-care/);
+    assert.match(result.content[0].text, /claude mcp add/);
   } finally {
     await client.close();
   }
