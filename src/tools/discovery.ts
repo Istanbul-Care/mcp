@@ -10,6 +10,7 @@ import type {
   Envelope,
   LanguageListData,
   PostCategoryListData,
+  ServiceCategoryListData,
   TagListData,
   PublicSearchData,
 } from "../api/types.js";
@@ -150,6 +151,45 @@ export function registerDiscoveryTools(server: McpServer): void {
           total: response.data.total,
           categories: response.data.categories.map((category) => ({
             id: category.id,
+            translations: category.translations.map((translation) => ({
+              language: translation.language.code,
+              name: translation.name,
+              slug: translation.slug,
+            })),
+          })),
+        });
+      }),
+  );
+
+  server.registerTool(
+    "list_service_categories",
+    {
+      title: "List service categories",
+      description:
+        "Service categories with every translation and their parent, for choosing which " +
+        "categories a page's services section shows (update_page services.category_ids). " +
+        "Requires login.",
+      inputSchema: {
+        project: projectParam,
+        search: z.string().optional(),
+        limit: z.number().int().min(1).max(100).default(100),
+        page: z.number().int().min(1).default(1),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ project, search, limit, page }) =>
+      guard(async () => {
+        const response = await get<Envelope<ServiceCategoryListData>>(
+          project,
+          "/admin/service-categories",
+          { search, limit, page, sort_order: "asc" },
+        );
+        return ok({
+          project,
+          total: response.data.total,
+          categories: response.data.categories.map((category) => ({
+            id: category.id,
+            parent_id: category.parent_id,
             translations: category.translations.map((translation) => ({
               language: translation.language.code,
               name: translation.name,

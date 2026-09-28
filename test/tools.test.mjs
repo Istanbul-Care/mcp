@@ -23,12 +23,14 @@ import { registerTranslateTools } from "../dist/tools/translate.js";
 
 const PROJECT = "staging";
 const handlers = new Map();
+const definitions = new Map();
 let calls = [];
 
 function fakeServer() {
   return {
-    registerTool(name, _def, handler) {
+    registerTool(name, def, handler) {
       handlers.set(name, handler);
+      definitions.set(name, def);
     },
     registerPrompt() {},
   };
@@ -175,6 +177,21 @@ test("get_page: shows the page's sticky WhatsApp, or null when it has none", asy
   assert.deepEqual(on.sticky_whatsapp, STICKY_WHATSAPP);
   const off = JSON.parse((await call("get_page", { project: PROJECT, page_id: 9 })).content[0].text);
   assert.equal(off.sticky_whatsapp, null);
+});
+
+test("update_page: the services section takes a style and its categories", async () => {
+  const services = { enabled: true, order: 3, grid_columns: 12, style: 2, category_ids: [7, 3] };
+  const r = await call("update_page", { project: PROJECT, page_id: 5, services });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().services, services);
+  assert.deepEqual(JSON.parse(r.content[0].text).changed, ["services"]);
+});
+
+test("update_page: the services section accepts only style 1 or 2 and category ids", () => {
+  const services = definitions.get("update_page").inputSchema.services;
+  assert.ok(services.safeParse({ enabled: true, style: 2, category_ids: [4] }).success);
+  assert.ok(!services.safeParse({ enabled: true, style: 3 }).success);
+  assert.ok(!services.safeParse({ enabled: true, category_ids: [0] }).success);
 });
 
 test("create_card / update_card / delete_card hit the right verbs and paths", async () => {

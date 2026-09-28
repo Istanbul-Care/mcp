@@ -238,6 +238,28 @@ const featureFlagParam = z.object({
   grid_columns: z.number().int().min(1).max(12).optional(),
 });
 
+const servicesFlagParam = featureFlagParam
+  .extend({
+    style: z
+      .union([z.literal(1), z.literal(2)])
+      .optional()
+      .describe(
+        "1 (default): a row of tall photo cards with the categories as tabs above it. " +
+          "2: each category's services side by side under the category's name.",
+      ),
+    category_ids: z
+      .array(z.number().int().positive())
+      .optional()
+      .describe(
+        "Only these service categories, in this order (ids from list_service_categories). " +
+          "Empty or left out shows every category. With a single category, style 1 shows no tabs.",
+      ),
+  })
+  .describe(
+    "The page's list of services. The object you pass REPLACES the stored one, so send style " +
+      "and category_ids each time — read get_page (feature_blocks.services) first.",
+  );
+
 const blogsFlagParam = featureFlagParam
   .extend({
     author_id: z.number().int().nullable().optional(),
@@ -811,7 +833,7 @@ export function registerPageTools(server: McpServer): void {
         page_content: pageContentParam.optional(),
         // Built-in blocks, switched on rather than attached by id.
         blogs: blogsFlagParam.optional(),
-        services: featureFlagParam.optional(),
+        services: servicesFlagParam.optional(),
         social_media: featureFlagParam.optional(),
         reviews: reviewsFlagParam.optional(),
         page_faq: pageFaqFlagParam.optional(),

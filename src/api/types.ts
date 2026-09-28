@@ -132,6 +132,21 @@ export interface PostCategoryListData {
   total_pages: number;
 }
 
+/** A service category as the admin list returns it; categories nest. */
+export interface ServiceCategoryListItem {
+  id: number;
+  parent_id: number | null;
+  translations: { language: LanguageInfo; name: string; slug: string }[];
+}
+
+export interface ServiceCategoryListData {
+  categories: ServiceCategoryListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
 export interface TagTranslation {
   id: number;
   language: LanguageInfo;

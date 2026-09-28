@@ -90,6 +90,7 @@ agent is doing the writing.
 | `localize_content_links` | – | Rewrites every internal anchor in an HTML block |
 | `login` / `submit_otp` / `auth_status` / `logout` | – | Session handling |
 | `list_post_categories` | ✓ | Categories with all translations |
+| `list_service_categories` | ✓ | Service categories with all translations and their parent — the ids for a page's services section |
 | `list_tags` | ✓ | Tags with all translations |
 | `list_posts` | ✓ | Posts including drafts and scheduled |
 | `get_post` | ✓ | One post in full, all translations |
@@ -106,7 +107,7 @@ agent is doing the writing.
 | `list_seo_schemas` / `set_post_seo_schema` | ✓ | Structured data (JSON-LD) |
 | `read_public_page` | – | A published page by slug path, with its real body HTML and full section payloads |
 | `list_pages` / `get_page` | ✓ | Pages with translations / one page's structure and SEO fields |
-| `create_page` / `update_page` | ✓ | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body; both also switch the page's sticky WhatsApp button (`sticky_whatsapp`: on/off + a link per language) |
+| `create_page` / `update_page` | ✓ | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body; both also switch the page's sticky WhatsApp button (`sticky_whatsapp`: on/off + a link per language); `update_page` sets the services section's `style` (1: tall cards with category tabs, 2: categories side by side) and `category_ids` (only those, in that order) |
 | `fold_page_cards` | ✓ | Move a page's prose cards into its `page_content` body, byte for byte (previews by default) |
 | `set_page_content` | ✓ | Write a page's body HTML for one language + enable/position the `page_content` block |
 | `get_card` / `get_page_cards` | ✓ | One card in full / a page's cards in render order, with their text and images |
