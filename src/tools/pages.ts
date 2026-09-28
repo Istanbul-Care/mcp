@@ -117,11 +117,18 @@ interface PageContentBlock {
   grid_columns?: number;
 }
 
+/** The WhatsApp button in the page's corner: language code -> link. */
+interface StickyWhatsApp {
+  enabled: boolean;
+  urls: Record<string, string>;
+}
+
 interface PageDetail extends PageListItem, PageSections {
   header_id?: number | null;
   footer_id?: number | null;
   featured_image_id?: number | null;
   page_content?: PageContentBlock | null;
+  sticky_whatsapp?: StickyWhatsApp | null;
 }
 
 /** Reduce a section's ordered items to the minimal {id, order, grid_columns}. */
@@ -267,6 +274,25 @@ const stickyFormFlagParam = featureFlagParam
     "The sticky bottom button. form_code and form_id are mutually exclusive; form_code wins.",
   );
 
+const stickyWhatsAppParam = z
+  .object({
+    enabled: z.boolean(),
+    urls: z
+      .record(z.string(), z.string())
+      .describe(
+        "Language code -> WhatsApp link, e.g. {\"en\": \"https://destakesk.github.io/<brand>-web-english/\", " +
+          "\"it\": \"…-web-italiano/\"}. A language left out shows no button on that language's page.",
+      ),
+  })
+  .describe(
+    "The green WhatsApp button in the page's bottom corner — separate from sticky_multi_form " +
+      "(a page can have both; the form button then sits above it). The visitor leaves their name " +
+      "and number, then goes to the link for the language they are reading the page in. Leads are " +
+      "reported as \"Sticky WhatsApp\" (form_source sticky_whatsapp). The object you pass REPLACES " +
+      "the stored one, so send every language's link each time — read get_page first. The brand's " +
+      "own per-language WhatsApp links are the per-language CTA links in its global settings.",
+  );
+
 const pageFaqFlagParam = featureFlagParam
   .extend({
     style: z
@@ -350,6 +376,7 @@ export function registerPageTools(server: McpServer): void {
           footer_id: pageDetail.footer_id,
           featured_image_id: pageDetail.featured_image_id,
           page_content: pageDetail.page_content ?? null,
+          sticky_whatsapp: pageDetail.sticky_whatsapp ?? null,
           sections,
           feature_blocks: Object.fromEntries(
             FLAG_KEYS.map((key) => [key, (pageDetail as unknown as Record<string, unknown>)[key] ?? null]).filter(
@@ -442,6 +469,7 @@ export function registerPageTools(server: McpServer): void {
         footer_id: z.number().int().optional(),
         featured_image_id: z.number().int().optional(),
         breadcrumb_enabled: z.boolean().default(true),
+        sticky_whatsapp: stickyWhatsAppParam.optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
@@ -747,7 +775,7 @@ export function registerPageTools(server: McpServer): void {
         "sections you omit are left unchanged. To add or remove one item, read get_page for " +
         "the current ids first. Note that `order` is a single sequence across ALL section " +
         "types on the page, not per type: a hero at order 5 renders below a card at order 2. " +
-        "Requires login.",
+        "Also switches the page's sticky WhatsApp button (sticky_whatsapp). Requires login.",
       inputSchema: {
         project: projectParam,
         page_id: z.number().int(),
@@ -788,6 +816,7 @@ export function registerPageTools(server: McpServer): void {
         reviews: reviewsFlagParam.optional(),
         page_faq: pageFaqFlagParam.optional(),
         sticky_multi_form: stickyFormFlagParam.optional(),
+        sticky_whatsapp: stickyWhatsAppParam.optional(),
         single_blog_content: featureFlagParam
           .optional()
           .describe(

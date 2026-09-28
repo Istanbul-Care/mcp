@@ -138,6 +138,45 @@ test("update_page: PUT /admin/pages/{id} replacing a section list", async () => 
   assert.equal(body.featured_image_id, 99);
 });
 
+const STICKY_WHATSAPP = {
+  enabled: true,
+  urls: {
+    en: "https://destakesk.github.io/brand-web-english/",
+    it: "https://destakesk.github.io/brand-web-italiano/",
+  },
+};
+
+test("update_page: sends sticky_whatsapp as given (it replaces the stored one)", async () => {
+  const r = await call("update_page", { project: PROJECT, page_id: 5, sticky_whatsapp: STICKY_WHATSAPP });
+  assert.ok(!isError(r));
+  assert.ok(lastCall().url.endsWith("/admin/pages/5"));
+  assert.deepEqual(lastBody().sticky_whatsapp, STICKY_WHATSAPP);
+  assert.deepEqual(JSON.parse(r.content[0].text).changed, ["sticky_whatsapp"]);
+});
+
+test("create_page: can switch the sticky WhatsApp on from the start", async () => {
+  const r = await call("create_page", {
+    project: PROJECT,
+    language_id: 22,
+    title: "Offer",
+    slug: "offer",
+    sticky_whatsapp: STICKY_WHATSAPP,
+  });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().sticky_whatsapp, STICKY_WHATSAPP);
+});
+
+test("get_page: shows the page's sticky WhatsApp, or null when it has none", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/pages/8": { status: "success", data: { id: 8, translations: [], sticky_whatsapp: STICKY_WHATSAPP } },
+    "/admin/pages/9": { status: "success", data: { id: 9, translations: [] } },
+  });
+  const on = JSON.parse((await call("get_page", { project: PROJECT, page_id: 8 })).content[0].text);
+  assert.deepEqual(on.sticky_whatsapp, STICKY_WHATSAPP);
+  const off = JSON.parse((await call("get_page", { project: PROJECT, page_id: 9 })).content[0].text);
+  assert.equal(off.sticky_whatsapp, null);
+});
+
 test("create_card / update_card / delete_card hit the right verbs and paths", async () => {
   await call("create_card", { project: PROJECT, language_id: 22, title: "Card" });
   assert.equal(lastCall().method, "POST");

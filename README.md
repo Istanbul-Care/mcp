@@ -106,7 +106,7 @@ agent is doing the writing.
 | `list_seo_schemas` / `set_post_seo_schema` | ✓ | Structured data (JSON-LD) |
 | `read_public_page` | – | A published page by slug path, with its real body HTML and full section payloads |
 | `list_pages` / `get_page` | ✓ | Pages with translations / one page's structure and SEO fields |
-| `create_page` / `update_page` | ✓ | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body |
+| `create_page` / `update_page` | ✓ | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body; both also switch the page's sticky WhatsApp button (`sticky_whatsapp`: on/off + a link per language) |
 | `fold_page_cards` | ✓ | Move a page's prose cards into its `page_content` body, byte for byte (previews by default) |
 | `set_page_content` | ✓ | Write a page's body HTML for one language + enable/position the `page_content` block |
 | `get_card` / `get_page_cards` | ✓ | One card in full / a page's cards in render order, with their text and images |
