@@ -260,7 +260,10 @@ export function registerComponentTools(server: McpServer): void {
       inputSchema: {
         project: projectParam,
         language_id: z.number().int(),
-        clinic_rank: z.string().describe("e.g. 'No.1 Hair Clinic'."),
+        clinic_rank: z
+          .string()
+          .optional()
+          .describe("The line above the headline, e.g. 'No.1 Hair Clinic'. Optional: left out, none shows."),
         title: z.string(),
         subtitle: z.string(),
         button_text: z.string(),

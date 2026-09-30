@@ -147,7 +147,10 @@ export function registerStructureTools(server: McpServer): void {
     params: {
       hero_id: z.number().int(),
       language_id: languageId,
-      clinic_rank: z.string().optional().describe("e.g. 'No.1 Hair Clinic'."),
+      clinic_rank: z
+        .string()
+        .optional()
+        .describe("The line above the headline, e.g. 'No.1 Hair Clinic'. '' removes it."),
       title: z.string().optional(),
       subtitle: z.string().optional(),
       button_text: z.string().optional(),
