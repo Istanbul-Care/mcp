@@ -119,7 +119,13 @@ export function registerStructureTools(server: McpServer): void {
       "per-language — use update_hero_translation or the translate tools.",
     params: {
       hero_id: z.number().int(),
-      style: z.string().optional().describe("default | cinematic | editorial | premium."),
+      style: z
+        .string()
+        .optional()
+        .describe(
+          "default | cinematic | editorial | premium | form. 'form' puts the brand's contact " +
+            "form on a card beside the headline (the hero's own button is not shown).",
+        ),
       background_image_id: z.number().int().optional(),
       mobile_background_image_id: z.number().int().optional(),
     },

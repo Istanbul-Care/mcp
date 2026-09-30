@@ -266,7 +266,11 @@ export function registerComponentTools(server: McpServer): void {
         button_text: z.string(),
         button_url: z.string(),
         motion_text: z.string().optional(),
-        style: z.string().optional(),
+        style: z
+          .string()
+          .optional()
+          .describe("default | cinematic | editorial | premium | form. 'form' puts the brand's " +
+            "contact form on a card beside the headline (the hero's own button is not shown)."),
         background_image_id: z.number().int().optional(),
         mobile_background_image_id: z.number().int().optional(),
         features: heroFeature,
