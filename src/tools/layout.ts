@@ -371,6 +371,34 @@ export function registerLayoutTools(server: McpServer): void {
     echo: ["section_id", "item_id"],
   });
 
+  // ---- Contact forms --------------------------------------------------------
+  registerWrite(server, {
+    name: "update_contact_form",
+    title: "Update a contact form's settings",
+    description:
+      "Changes a contact form's own settings (not its per-language texts — use the translation " +
+      "tools for those): where its leads are e-mailed, and whether it is the brand's default form.",
+    params: {
+      contact_form_id: z.number().int(),
+      is_default: z
+        .boolean()
+        .optional()
+        .describe(
+          "The brand's default form: the one used wherever a form is shown or a lead is filed " +
+            "without naming a form (the form every WhatsApp link opens first, the popup and hero " +
+            "forms, calculator leads). One per brand — setting it on one form clears the others.",
+        ),
+      forward_to_email: z.string().optional(),
+    },
+    method: "put",
+    path: (a) => `/admin/contact-form/${a.contact_form_id}`,
+    body: (a) => ({
+      is_default: a.is_default,
+      forward_to_email: a.forward_to_email,
+    }),
+    echo: ["contact_form_id"],
+  });
+
   // ---- Multi-step forms ---------------------------------------------------
   registerWrite(server, {
     name: "update_multi_page_form",

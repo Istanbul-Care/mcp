@@ -21,6 +21,7 @@ import { registerSeoTools } from "../dist/tools/seo.js";
 import { registerComponentTools } from "../dist/tools/components.js";
 import { registerTranslateTools } from "../dist/tools/translate.js";
 import { registerStructureTools } from "../dist/tools/structure.js";
+import { registerLayoutTools } from "../dist/tools/layout.js";
 
 const PROJECT = "staging";
 const handlers = new Map();
@@ -69,6 +70,7 @@ before(() => {
     registerComponentTools,
     registerTranslateTools,
     registerStructureTools,
+    registerLayoutTools,
   ]) {
     register(server);
   }
@@ -204,6 +206,14 @@ test("update_hero: sets the spotlight style and its side image (0 removes it)", 
   assert.equal(lastBody().side_image_id, 42);
   await call("update_hero", { project: PROJECT, hero_id: 6, side_image_id: 0 });
   assert.equal(lastBody().side_image_id, 0);
+});
+
+test("update_contact_form: makes a form the brand's default", async () => {
+  const r = await call("update_contact_form", { project: PROJECT, contact_form_id: 3, is_default: true });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/contact-form/3"));
+  assert.deepEqual(lastBody(), { is_default: true });
 });
 
 test("update_global_setting: can put the lead form in the popup", async () => {

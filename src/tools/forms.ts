@@ -44,6 +44,14 @@ export function registerFormTools(server: McpServer): void {
         background_image_id: z.number().int().optional(),
         image_id: z.number().int().optional(),
         forward_to_email: z.string().optional().describe("Where submissions are e-mailed."),
+        is_default: z
+          .boolean()
+          .optional()
+          .describe(
+            "The brand's default form: the one used wherever a form is shown or a lead is filed " +
+            "without naming a form (the form every WhatsApp link opens first, the popup and hero " +
+            "forms, calculator leads). One per brand — setting it on one form clears the others.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
