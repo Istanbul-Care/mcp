@@ -272,8 +272,10 @@ export function registerComponentTools(server: McpServer): void {
         style: z
           .string()
           .optional()
-          .describe("default | cinematic | editorial | premium | form. 'form' puts the brand's " +
-            "contact form on a card beside the headline (the hero's own button is not shown)."),
+          .describe("default | cinematic | editorial | premium | form | spotlight. 'form' puts the " +
+            "brand's contact form on a card beside the headline (the hero's own button is not shown). " +
+            "'spotlight' shows the background image in a frame beside the headline and button, the " +
+            "first three features over it as cards, and the contact form as a strip below."),
         background_image_id: z.number().int().optional(),
         mobile_background_image_id: z.number().int().optional(),
         features: heroFeature,
