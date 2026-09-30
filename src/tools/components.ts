@@ -562,7 +562,9 @@ export function registerComponentTools(server: McpServer): void {
         popup_show_form: z
           .boolean()
           .default(false)
-          .describe("Show the page's lead form inside the popup in place of its button (only while popup_enabled)."),
+          .describe("Show a lead form inside the popup in place of its button (only while popup_enabled). After sending: " +
+            "the popup's button link if it has one (a WhatsApp link opens straight away, no second form), " +
+            "else a thank-you and the popup closes. Leave the button link empty for a form-only popup."),
         is_active: z.boolean().optional(),
         language_id: z.number().int(),
         address: z.string(),
@@ -605,7 +607,9 @@ export function registerComponentTools(server: McpServer): void {
         popup_show_form: z
           .boolean()
           .optional()
-          .describe("Show the page's lead form inside the popup in place of its button (only while popup_enabled)."),
+          .describe("Show a lead form inside the popup in place of its button (only while popup_enabled). After sending: " +
+            "the popup's button link if it has one (a WhatsApp link opens straight away, no second form), " +
+            "else a thank-you and the popup closes. Leave the button link empty for a form-only popup."),
         is_active: z.boolean().optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
