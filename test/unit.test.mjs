@@ -245,9 +245,15 @@ test("checkVocabulary: rejects a value the site has no branch for", () => {
 });
 
 test("checkVocabulary: rejects panel options the site never renders", () => {
-  // Both are selectable in the admin panel but fall through on the site.
+  // Selectable in the admin panel (coverflow was, until it became "form") but
+  // they fall through on the site.
   assert.equal(checkVocabulary("card_type", "media_slider").ok, false);
   assert.equal(checkVocabulary("hero_style", "coverflow").ok, false);
+});
+
+test("checkVocabulary: the form and spotlight heroes are real styles", () => {
+  assert.equal(checkVocabulary("hero_style", "form").ok, true);
+  assert.equal(checkVocabulary("hero_style", "spotlight").ok, true);
 });
 
 test("checkVocabulary: slider style is capitalised", () => {

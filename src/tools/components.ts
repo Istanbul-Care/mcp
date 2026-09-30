@@ -274,10 +274,16 @@ export function registerComponentTools(server: McpServer): void {
           .optional()
           .describe("default | cinematic | editorial | premium | form | spotlight. 'form' puts the " +
             "brand's contact form on a card beside the headline (the hero's own button is not shown). " +
-            "'spotlight' shows the background image in a frame beside the headline and button, the " +
-            "first three features over it as cards, and the contact form as a strip below."),
+            "'spotlight' puts the headline, the hero's button and up to four features over the " +
+            "background, the side image (side_image_id) beside them when set, and the contact form " +
+            "as a strip below."),
         background_image_id: z.number().int().optional(),
         mobile_background_image_id: z.number().int().optional(),
+        side_image_id: z
+          .number()
+          .int()
+          .optional()
+          .describe("A picture beside the text (the spotlight style), the same in every language."),
         features: heroFeature,
         icons: z
           .array(z.record(z.unknown()))
@@ -298,6 +304,7 @@ export function registerComponentTools(server: McpServer): void {
       style,
       background_image_id,
       mobile_background_image_id,
+      side_image_id,
       features,
       icons,
     }) =>
@@ -315,6 +322,7 @@ export function registerComponentTools(server: McpServer): void {
           style,
           background_image_id,
           mobile_background_image_id,
+          side_image_id,
           features,
           icons,
         }, [["hero_style", style]]),

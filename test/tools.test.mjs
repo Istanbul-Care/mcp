@@ -20,6 +20,7 @@ import { registerHeaderTools } from "../dist/tools/header.js";
 import { registerSeoTools } from "../dist/tools/seo.js";
 import { registerComponentTools } from "../dist/tools/components.js";
 import { registerTranslateTools } from "../dist/tools/translate.js";
+import { registerStructureTools } from "../dist/tools/structure.js";
 
 const PROJECT = "staging";
 const handlers = new Map();
@@ -67,6 +68,7 @@ before(() => {
     registerSeoTools,
     registerComponentTools,
     registerTranslateTools,
+    registerStructureTools,
   ]) {
     register(server);
   }
@@ -192,6 +194,16 @@ test("update_page: the services section accepts only style 1 or 2 and category i
   assert.ok(services.safeParse({ enabled: true, style: 2, category_ids: [4] }).success);
   assert.ok(!services.safeParse({ enabled: true, style: 3 }).success);
   assert.ok(!services.safeParse({ enabled: true, category_ids: [0] }).success);
+});
+
+test("update_hero: sets the spotlight style and its side image (0 removes it)", async () => {
+  const r = await call("update_hero", { project: PROJECT, hero_id: 6, style: "spotlight", side_image_id: 42 });
+  assert.ok(!isError(r));
+  assert.ok(lastCall().url.endsWith("/admin/heroes/6"));
+  assert.equal(lastBody().style, "spotlight");
+  assert.equal(lastBody().side_image_id, 42);
+  await call("update_hero", { project: PROJECT, hero_id: 6, side_image_id: 0 });
+  assert.equal(lastBody().side_image_id, 0);
 });
 
 test("update_global_setting: can put the lead form in the popup", async () => {

@@ -8,9 +8,10 @@
  * as nothing.
  *
  * The values here are the ones the **site** honours, which is not always what
- * the panel offers: hero `coverflow` and card `media_slider` are selectable in
- * the panel but have no branch on the site, so they are listed as accepted
- * with a warning rather than silently recommended.
+ * the panel offers: card `media_slider` is selectable in the panel but has no
+ * branch on the site, so it is listed as accepted with a warning rather than
+ * silently recommended. (Hero `coverflow` was too, until the panel's option
+ * became `form`.)
  *
  * Site-side sources:
  *   CardSection.tsx · HeroesWrapper.tsx · Footer/index.tsx · Sliders.tsx
@@ -75,7 +76,13 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
       { value: "cinematic" },
       { value: "editorial" },
       { value: "premium" },
-      { value: "coverflow", unrendered: true, note: "Offered by the panel but the site has no branch — renders as default." },
+      { value: "form", note: "The brand's contact form on a card beside the headline; the hero's own button is not shown." },
+      {
+        value: "spotlight",
+        note:
+          "Background photo behind the headline, the hero's button and up to four features; the side " +
+          "image (side_image_id) beside them when set; the brand's contact form as a strip below.",
+      },
     ],
     on_unknown: "Falls back to default.",
   },
