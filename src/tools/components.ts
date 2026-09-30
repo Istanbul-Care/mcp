@@ -559,6 +559,10 @@ export function registerComponentTools(server: McpServer): void {
         favicon_media_id: z.number().int().optional(),
         chat_bot_enabled: z.boolean().default(false),
         popup_enabled: z.boolean().default(false),
+        popup_show_form: z
+          .boolean()
+          .default(false)
+          .describe("Show the page's lead form inside the popup in place of its button (only while popup_enabled)."),
         is_active: z.boolean().optional(),
         language_id: z.number().int(),
         address: z.string(),
@@ -598,6 +602,10 @@ export function registerComponentTools(server: McpServer): void {
         favicon_media_id: z.number().int().optional(),
         chat_bot_enabled: z.boolean().optional(),
         popup_enabled: z.boolean().optional(),
+        popup_show_form: z
+          .boolean()
+          .optional()
+          .describe("Show the page's lead form inside the popup in place of its button (only while popup_enabled)."),
         is_active: z.boolean().optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },

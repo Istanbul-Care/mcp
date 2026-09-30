@@ -194,6 +194,14 @@ test("update_page: the services section accepts only style 1 or 2 and category i
   assert.ok(!services.safeParse({ enabled: true, category_ids: [0] }).success);
 });
 
+test("update_global_setting: can put the lead form in the popup", async () => {
+  const r = await call("update_global_setting", { project: PROJECT, setting_id: 1, popup_show_form: true });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/global-settings/1"));
+  assert.deepEqual(lastBody(), { popup_show_form: true });
+});
+
 test("create_card / update_card / delete_card hit the right verbs and paths", async () => {
   await call("create_card", { project: PROJECT, language_id: 22, title: "Card" });
   assert.equal(lastCall().method, "POST");
