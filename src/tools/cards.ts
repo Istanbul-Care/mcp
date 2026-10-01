@@ -281,7 +281,15 @@ export function registerCardTools(server: McpServer): void {
         button_text: z.string().optional(),
         button_url: z.string().optional(),
         button_icon: z.string().optional().describe("Icon key (shared across languages)."),
-        type: z.string().optional().describe("Card style/type; see existing cards for values."),
+        type: z
+          .string()
+          .optional()
+          .describe(
+            "Card style/type; see existing cards for values. 'media_slider' is the logo row " +
+              "(press, partners, awards): the title sits between two rules and media_ids are the " +
+              "logos, shown side by side with a button at each end that slides them on a click; " +
+              "it needs no description.",
+          ),
         image_id: z.number().int().optional(),
         media_ids: z.array(z.number().int()).optional(),
         sort_order: z.number().int().optional(),
