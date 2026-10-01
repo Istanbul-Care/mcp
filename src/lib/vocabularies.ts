@@ -52,7 +52,7 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
       { value: "vertical_slider", label: "Vertical slider" },
       { value: "testimonial_gallery", label: "Testimonial gallery", note: "Media are consumed in pairs; an odd count leaves a gap." },
       { value: "word_cloud", label: "Why choose us", note: "Its description must be a JSON array of {title, description}." },
-      { value: "media_slider", unrendered: true, note: "Offered by the panel but the site has no branch for it — renders as a plain card." },
+      { value: "media_slider", label: "Logo row", note: "A row of logos (press, partners, awards): the title between two rules, the media side by side, a button at each end that slides the row on a click (no autoplay). Rendered by the site since 2026-10-01." },
     ],
     on_unknown: "Falls back to the plain image/text card.",
   },
