@@ -123,8 +123,19 @@ interface StickyWhatsApp {
   urls: Record<string, string>;
 }
 
+/** How a page shows its header — chosen per page, classic by default. */
+const headerStyleParam = z
+  .enum(["classic", "transparent"])
+  .describe(
+    "The page's header design: 'classic' = the brand bar (default); 'transparent' = no " +
+      "background over the page's opening picture (hero or breadcrumb banner image), the " +
+      "brand background coming in once the visitor scrolls. A page that does not open on " +
+      "such a picture shows the transparent design with its background from the start.",
+  );
+
 interface PageDetail extends PageListItem, PageSections {
   header_id?: number | null;
+  header_style?: "classic" | "transparent" | null;
   footer_id?: number | null;
   featured_image_id?: number | null;
   page_content?: PageContentBlock | null;
@@ -395,6 +406,7 @@ export function registerPageTools(server: McpServer): void {
           id: pageDetail.id,
           parent_id: pageDetail.parent_id,
           header_id: pageDetail.header_id,
+          header_style: pageDetail.header_style ?? "classic",
           footer_id: pageDetail.footer_id,
           featured_image_id: pageDetail.featured_image_id,
           page_content: pageDetail.page_content ?? null,
@@ -488,6 +500,7 @@ export function registerPageTools(server: McpServer): void {
         robots_follow: z.boolean().default(true),
         parent_id: z.number().int().optional().describe("Nest under another page."),
         header_id: z.number().int().optional(),
+        header_style: headerStyleParam.optional(),
         footer_id: z.number().int().optional(),
         featured_image_id: z.number().int().optional(),
         breadcrumb_enabled: z.boolean().default(true),
@@ -803,6 +816,7 @@ export function registerPageTools(server: McpServer): void {
         page_id: z.number().int(),
         featured_image_id: z.number().int().nullable().optional().describe("Cover image; null to clear."),
         header_id: z.number().int().optional(),
+        header_style: headerStyleParam.optional(),
         footer_id: z.number().int().optional(),
         parent_id: z.number().int().nullable().optional(),
         cards: orderedItems.optional(),
