@@ -26,8 +26,7 @@ const categoryIconUpdate = z
   .number()
   .int()
   .nullable()
-  .optional()
-  .describe(`${CATEGORY_ICON_TEXT} null removes it; leave it out to keep the current one.`);
+  .describe(`${CATEGORY_ICON_TEXT} null removes it.`);
 
 interface CreatedCategory {
   id: number;
