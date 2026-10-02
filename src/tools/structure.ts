@@ -734,7 +734,15 @@ export function registerStructureTools(server: McpServer): void {
       promotional_landing_id: z.number().int(),
       sort_order: sortOrder,
       background_image_id: z.number().int().optional(),
-      video_id: z.number().int().optional(),
+      video_id: z
+        .number()
+        .int()
+        .optional()
+        .describe(
+          "A video media id (upload_media for a file, add_external_media for YouTube/TikTok). " +
+          "The landing shows the video's own thumbnail as its cover until play; set or " +
+          "replace it with set_media_thumbnail.",
+        ),
       gallery_ids: z.array(z.number().int()).optional().describe("Replaces the gallery wholesale."),
       language_id: z.number().int().optional(),
       title: z.string().optional(),

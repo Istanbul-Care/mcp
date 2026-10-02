@@ -327,6 +327,41 @@ test("upload_media: reads a local file and POSTs multipart to /admin/media", asy
   assert.ok(c.body instanceof FormData);
 });
 
+test("upload_media: a video needs its cover picture", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "mcp-test-"));
+  const video = join(dir, "story.mp4");
+  writeFileSync(video, Buffer.from([0, 0, 0, 24]));
+  const r = await call("upload_media", { project: PROJECT, file_path: video });
+  assert.ok(isError(r));
+});
+
+test("upload_media: a video goes up with its thumbnail_file, without the WebP switch", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "mcp-test-"));
+  const video = join(dir, "story.mp4");
+  const cover = join(dir, "cover.jpg");
+  writeFileSync(video, Buffer.from([0, 0, 0, 24]));
+  writeFileSync(cover, Buffer.from([0xff, 0xd8, 0xff]));
+  const r = await call("upload_media", { project: PROJECT, file_path: video, thumbnail_path: cover });
+  assert.ok(!isError(r));
+  const body = lastCall().body;
+  assert.ok(body instanceof FormData);
+  assert.ok(body.get("file"));
+  assert.ok(body.get("thumbnail_file"));
+  assert.equal(body.get("convert_to_webp"), null);
+});
+
+test("set_media_thumbnail: PUTs the picture to /admin/media/{id}/thumbnail", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "mcp-test-"));
+  const cover = join(dir, "cover.jpg");
+  writeFileSync(cover, Buffer.from([0xff, 0xd8, 0xff]));
+  const r = await call("set_media_thumbnail", { project: PROJECT, media_id: 3459, file_path: cover });
+  assert.ok(!isError(r));
+  const c = lastCall();
+  assert.equal(c.method, "PUT");
+  assert.ok(c.url.endsWith("/admin/media/3459/thumbnail"));
+  assert.ok(c.body.get("thumbnail_file"));
+});
+
 test("create_video_schema: builds a VideoObject JSON-LD and POSTs it", async () => {
   const r = await call("create_video_schema", {
     project: PROJECT,

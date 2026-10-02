@@ -18,7 +18,7 @@ import { basename, extname } from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { get, postForm } from "../api/client.js";
+import { get, postForm, putForm } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
 import { ok, fail, guard, projectParam } from "./helpers.js";
 
@@ -52,6 +52,8 @@ const MIME_BY_EXT: Record<string, string> = {
   ".avif": "image/avif",
   ".mp4": "video/mp4",
   ".webm": "video/webm",
+  ".mov": "video/quicktime",
+  ".avi": "video/x-msvideo",
   ".pdf": "application/pdf",
 };
 
@@ -106,17 +108,25 @@ export function registerMediaTools(server: McpServer): void {
   server.registerTool(
     "upload_media",
     {
-      title: "Upload an image to the media library",
+      title: "Upload an image or a video to the media library",
       description:
-        "Uploads a local image file into a brand's media library and returns its id — use " +
-        "that id as a post's featured_image_id or an in-page image. Converts to WebP by " +
-        "default. Provide alt text in the brand's default language here; other languages are " +
-        "filled later via the translation tools (type 'media'). Requires login.",
+        "Uploads a local image or video file into a brand's media library and returns its id. " +
+        "An image becomes e.g. a post's featured_image_id or an in-page image (converted to " +
+        "WebP by default). A video needs a cover picture, as in the panel: pass " +
+        "thumbnail_path — the site shows it until the visitor presses play (e.g. on a " +
+        "promotional landing). Provide alt text in the brand's default language here; other " +
+        "languages are filled later via the translation tools (type 'media'). Requires login.",
       inputSchema: {
         project: projectParam,
         file_path: z
           .string()
-          .describe("Absolute path to the image file on this machine."),
+          .describe("Absolute path to the image or video file on this machine."),
+        thumbnail_path: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to the cover image for a video (required for videos, ignored for images).",
+          ),
         alt: z
           .string()
           .optional()
@@ -126,24 +136,38 @@ export function registerMediaTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
-    async ({ project, file_path, alt, name, convert_to_webp }) =>
+    async ({ project, file_path, thumbnail_path, alt, name, convert_to_webp }) =>
       guard(async () => {
 
-        let bytes: Buffer;
-        try {
-          bytes = readFileSync(file_path);
-        } catch (error) {
+        const mime = mimeFor(file_path);
+        const isVideo = mime.startsWith("video/");
+        if (isVideo && !thumbnail_path) {
           return fail(
-            `Cannot read '${file_path}': ${error instanceof Error ? error.message : String(error)}`,
+            "A video needs a cover picture: pass thumbnail_path (an image file). The site " +
+              "shows it until the visitor presses play.",
           );
         }
 
+        const files: Array<[string, string, string]> = [["file", file_path, mime]];
+        if (isVideo && thumbnail_path) {
+          files.push(["thumbnail_file", thumbnail_path, mimeFor(thumbnail_path)]);
+        }
         const form = new FormData();
+        for (const [field, path, type] of files) {
+          let bytes: Buffer;
+          try {
+            bytes = readFileSync(path);
+          } catch (error) {
+            return fail(
+              `Cannot read '${path}': ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+          form.append(field, new Blob([bytes], { type }), basename(path));
+        }
         const filename = basename(file_path);
-        form.append("file", new Blob([bytes], { type: mimeFor(file_path) }), filename);
         if (alt) form.append("alt", alt);
         form.append("name", name ?? filename);
-        form.append("convert_to_webp", String(convert_to_webp));
+        if (!isVideo) form.append("convert_to_webp", String(convert_to_webp));
 
         const response = await postForm<Envelope<MediaItem>>(project, "/admin/media", form);
         return ok({
@@ -152,6 +176,45 @@ export function registerMediaTools(server: McpServer): void {
           ...summarise(response.data),
           ...(alt ? {} : { note: "No alt text set — add one for SEO/accessibility." }),
         });
+      }),
+  );
+
+  server.registerTool(
+    "set_media_thumbnail",
+    {
+      title: "Set or replace a media item's thumbnail",
+      description:
+        "Sets or replaces the cover picture of a media item — a video file, or a YouTube / " +
+        "TikTok media added with add_external_media. The site shows it until the visitor " +
+        "presses play, e.g. as a promotional landing's video cover. Every replacement gets a " +
+        "new address, so the site shows the new picture at once, and the pages that show " +
+        "the media are refreshed. list_media shows each item's current thumbnail_url. " +
+        "Requires login.",
+      inputSchema: {
+        project: projectParam,
+        media_id: z.number().int().describe("The media item (from list_media or upload_media)."),
+        file_path: z.string().describe("Absolute path to the cover image on this machine."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, media_id, file_path }) =>
+      guard(async () => {
+        let bytes: Buffer;
+        try {
+          bytes = readFileSync(file_path);
+        } catch (error) {
+          return fail(
+            `Cannot read '${file_path}': ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+        const form = new FormData();
+        form.append("thumbnail_file", new Blob([bytes], { type: mimeFor(file_path) }), basename(file_path));
+        const response = await putForm<Envelope<MediaItem>>(
+          project,
+          `/admin/media/${media_id}/thumbnail`,
+          form,
+        );
+        return ok({ project, thumbnail_set: true, ...summarise(response.data) });
       }),
   );
 

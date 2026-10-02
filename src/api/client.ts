@@ -218,12 +218,34 @@ export function del<T>(project: ProjectId, path: string, auth = true): Promise<T
  * does NOT set Content-Type — fetch derives the multipart boundary from the
  * FormData itself, and an explicit header would break the boundary.
  */
-export async function postForm<T>(
+export function postForm<T>(
   project: ProjectId,
   path: string,
   form: FormData,
   auth = true,
   timeoutMs = 120_000,
+): Promise<T> {
+  return sendForm<T>("POST", project, path, form, auth, timeoutMs);
+}
+
+/** A multipart PUT — replacing a file on an existing record (e.g. a thumbnail). */
+export function putForm<T>(
+  project: ProjectId,
+  path: string,
+  form: FormData,
+  auth = true,
+  timeoutMs = 120_000,
+): Promise<T> {
+  return sendForm<T>("PUT", project, path, form, auth, timeoutMs);
+}
+
+async function sendForm<T>(
+  method: "POST" | "PUT",
+  project: ProjectId,
+  path: string,
+  form: FormData,
+  auth: boolean,
+  timeoutMs: number,
 ): Promise<T> {
   const url = buildUrl(project, path);
   const headers: Record<string, string> = { Accept: "application/json" };
@@ -234,7 +256,7 @@ export async function postForm<T>(
   }
 
   const response = await fetch(url, {
-    method: "POST",
+    method,
     headers,
     body: form,
     signal: AbortSignal.timeout(timeoutMs),
