@@ -63,7 +63,7 @@ export const DISPATCHED_LINK_FIELDS = [
  * a sentinel typed here produces a 404 instead of a modal.
  */
 export const UNDISPATCHED_LINK_FIELDS = [
-  "header_item.url (a plain menu link; a header button, button_style set, does take 'consultation')",
+  "header_item.url (a plain menu link; a header button, button_style set, opens 'consultation' and 'modal-dialog-…' forms)",
   "footer_section_item.url (top sections)",
 ] as const;
 

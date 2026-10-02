@@ -261,7 +261,9 @@ anywhere. Two tools carry the rules:
   the rich-text lead anchors, and the WhatsApp hosts that gate a lead form.
   It also names the fields where these do **not** work: the header menu and
   the top footer sections render through a plain link, so the same string that
-  opens a modal on a card button 404s in the navigation.
+  opens a modal on a card button 404s in the navigation. A header button (a
+  menu item with `button_style`) is the exception: it opens `consultation` and
+  `modal-dialog-…` forms.
 - `get_vocabularies` — every field where only a listed value renders: card and
   hero styles, menu item types, link icons, media types, form field types. The
   write tools reject a value the site cannot use, including two the admin panel
