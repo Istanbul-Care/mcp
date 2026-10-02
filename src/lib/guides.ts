@@ -69,7 +69,8 @@ anything starting with \`modal-dialog-\`, and the rich-text anchors
 \`#get-free-consultation\` / \`#dialog=get-free-consultation\`. Call
 get_link_conventions before writing any button_url or menu URL. They work on
 card, hero, CTA and footer-bottom links, and **do not work** in the header
-menu or the top footer sections, where they 404.
+menu or the top footer sections, where they 404 — except that a header button
+(a menu item with \`button_style\`) takes \`consultation\`.
 
 **Fixed vocabularies.** Card type, hero/footer/slider/before-after/FAQ style,
 menu item type, link icon, media type, form field type. Call get_vocabularies;

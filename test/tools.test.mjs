@@ -427,6 +427,83 @@ test("list_service_categories / list_post_categories: each category shows its ic
   }
 });
 
+// --- header buttons: a top-level custom_button item shown as a button -------
+
+test("add_header_item: button_style and button_show_on are sent beside the translation", async () => {
+  const r = await call("add_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    language_id: 22,
+    label: "Free Consultation",
+    url: "consultation",
+    item_type: "custom_button",
+    button_style: "filled",
+    button_show_on: "mobile",
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/headers/6/items"));
+  const body = lastBody();
+  assert.equal(body.button_style, "filled");
+  assert.equal(body.button_show_on, "mobile");
+  assert.equal(body.translations[0].url, "consultation");
+
+  // Neither given: no keys at all, so the item is created as a plain menu link.
+  await call("add_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    language_id: 22,
+    label: "About",
+    url: "about",
+    item_type: "custom_button",
+  });
+  assert.ok(!("button_style" in lastBody()));
+  assert.ok(!("button_show_on" in lastBody()));
+});
+
+test("update_header_item: button fields sent when given, null clears them, leaving them out keeps them", async () => {
+  const r = await call("update_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    button_style: "outline",
+    button_show_on: "desktop",
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/headers/6/items/18"));
+  assert.deepEqual(lastBody(), { button_style: "outline", button_show_on: "desktop" });
+
+  // null: a plain menu link again, shown on both.
+  await call("update_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    button_style: null,
+    button_show_on: null,
+  });
+  assert.deepEqual(lastBody(), { button_style: null, button_show_on: null });
+
+  await call("update_header_item", { project: PROJECT, header_id: 6, item_id: 18, order: 2 });
+  assert.deepEqual(lastBody(), { order: 2 });
+});
+
+test("add_header_item / update_header_item: the button fields take their listed values or null", () => {
+  // The handlers are called directly above; the schemas must let these through too.
+  for (const tool of ["add_header_item", "update_header_item"]) {
+    const { button_style, button_show_on } = definitions.get(tool).inputSchema;
+    for (const value of ["filled", "green", "outline", null, undefined]) {
+      assert.ok(button_style.safeParse(value).success, `${tool} button_style ${value}`);
+    }
+    for (const value of ["both", "mobile", "desktop", null, undefined]) {
+      assert.ok(button_show_on.safeParse(value).success, `${tool} button_show_on ${value}`);
+    }
+    assert.ok(!button_style.safeParse("primary").success, tool);
+    assert.ok(!button_style.safeParse("").success, tool);
+    assert.ok(!button_show_on.safeParse("tablet").success, tool);
+  }
+});
+
 test("list_media: GET /admin/media with search params", async () => {
   await call("list_media", { project: PROJECT, search: "logo", limit: 20, page: 1 });
   assert.equal(lastCall().method, "GET");

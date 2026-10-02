@@ -44,6 +44,36 @@ const CATEGORY_MENU_ICONS =
   "In a category menu (item_type service_category or post_category) each listed category " +
   "shows its own icon — set those with update_service_category / update_post_category.";
 
+/**
+ * A top-level link can show as a button. button_style and button_show_on go
+ * through exactly like icon_media_id: null is sent (a plain link / shown on
+ * both) and an omitted key stays undefined, so an update keeps the value.
+ */
+const BUTTON_STYLES = ["filled", "green", "outline"] as const;
+const BUTTON_SHOW_ON = ["both", "mobile", "desktop"] as const;
+
+const BUTTON_STYLE_TEXT =
+  "Shows the item as a button instead of a plain menu link: 'filled' (the brand colour), " +
+  "'green' or 'outline'. Only a TOP-LEVEL item (no parent_id) of item_type custom_button " +
+  "that has a URL shows as a button; on any other item it does nothing. On desktop, where " +
+  "the menu is in the bar, the button sits in the bar at the item's place in the menu " +
+  "order. On phones and tablets, where the menu is behind the burger, the buttons gather at " +
+  "the bottom of that menu as big rounded buttons: the first full width, the rest two per " +
+  "row when they fit. A button's URL can be any address: a page slug, a full https " +
+  "address, a WhatsApp link (the site asks the visitor for their details before opening " +
+  "WhatsApp), tel:+90…, mailto:…, or the word 'consultation', which opens the site's free " +
+  "consultation form.";
+
+const BUTTON_SHOW_ON_TEXT =
+  "Where the button shows: 'both' (the default), 'mobile' (only on phones and tablets, at " +
+  "the bottom of the burger menu) or 'desktop' (only in the bar on wide screens). It " +
+  "matters only while button_style is set.";
+
+const BUTTON_OPTION =
+  "A top-level custom_button item with a URL can show as a button instead of a link " +
+  "(button_style), on mobile only, desktop only or both (button_show_on) — e.g. a 'Free " +
+  "consultation' button whose url is 'consultation'.";
+
 export function registerHeaderTools(server: McpServer): void {
   server.registerTool(
     "list_headers",
@@ -81,6 +111,8 @@ export function registerHeaderTools(server: McpServer): void {
         "Adds a menu item to a header, with its label and link in ONE language. Nest under " +
         "another item with parent_id (for dropdowns). Add other languages with the " +
         "translation tools (type 'header_item'). " +
+        BUTTON_OPTION +
+        " " +
         CATEGORY_MENU_ICONS +
         " Requires login.",
       inputSchema: {
@@ -113,6 +145,16 @@ export function registerHeaderTools(server: McpServer): void {
           .nullable()
           .optional()
           .describe(`${ICON_TEXT} Leave it out for no icon.`),
+        button_style: z
+          .enum(BUTTON_STYLES)
+          .nullable()
+          .optional()
+          .describe(`${BUTTON_STYLE_TEXT} Leave it out (or null) for a plain menu link.`),
+        button_show_on: z
+          .enum(BUTTON_SHOW_ON)
+          .nullable()
+          .optional()
+          .describe(`${BUTTON_SHOW_ON_TEXT} Leave it out (or null) for both.`),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
@@ -127,6 +169,8 @@ export function registerHeaderTools(server: McpServer): void {
       order,
       is_active,
       icon_media_id,
+      button_style,
+      button_show_on,
     }) =>
       guard(async () => {
         const badValue = ensureVocabulary([["header_item_type", item_type]]);
@@ -140,6 +184,8 @@ export function registerHeaderTools(server: McpServer): void {
             order,
             is_active,
             icon_media_id,
+            button_style,
+            button_show_on,
             translations: [{ language_id, label, url }],
           },
         );
@@ -152,8 +198,11 @@ export function registerHeaderTools(server: McpServer): void {
     {
       title: "Edit a navbar item's structure",
       description:
-        "Updates a menu item's structure — its type, order, active flag, parent or icon. Text " +
-        "(label/url) is per-language: change it with the translation tools. " +
+        "Updates a menu item's structure — its type, order, active flag, parent, icon or " +
+        "button look. Text (label/url) is per-language: change it with the translation " +
+        "tools. " +
+        BUTTON_OPTION +
+        " " +
         CATEGORY_MENU_ICONS +
         " Requires login.",
       inputSchema: {
@@ -170,6 +219,22 @@ export function registerHeaderTools(server: McpServer): void {
           .nullable()
           .optional()
           .describe(`${ICON_TEXT} null removes it; leave it out to keep the current one.`),
+        button_style: z
+          .enum(BUTTON_STYLES)
+          .nullable()
+          .optional()
+          .describe(
+            `${BUTTON_STYLE_TEXT} null makes it a plain menu link again; leave it out to keep ` +
+              "the current style.",
+          ),
+        button_show_on: z
+          .enum(BUTTON_SHOW_ON)
+          .nullable()
+          .optional()
+          .describe(
+            `${BUTTON_SHOW_ON_TEXT} null shows it on both again; leave it out to keep the ` +
+              "current value.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
