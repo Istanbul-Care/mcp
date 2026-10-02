@@ -119,6 +119,9 @@ export interface PostCategoryTranslation {
 
 export interface PostCategoryListItem {
   id: number;
+  /** The icon a header category menu shows beside this category; null when none. */
+  icon_media_id?: number | null;
+  icon_media_url?: string | null;
   translations: PostCategoryTranslation[];
   created_at: string;
   updated_at: string;
@@ -136,6 +139,9 @@ export interface PostCategoryListData {
 export interface ServiceCategoryListItem {
   id: number;
   parent_id: number | null;
+  /** The icon a header category menu shows beside this category; null when none. */
+  icon_media_id?: number | null;
+  icon_media_url?: string | null;
   translations: { language: LanguageInfo; name: string; slug: string }[];
 }
 

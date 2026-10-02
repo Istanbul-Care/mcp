@@ -22,6 +22,8 @@ import { registerComponentTools } from "../dist/tools/components.js";
 import { registerTranslateTools } from "../dist/tools/translate.js";
 import { registerStructureTools } from "../dist/tools/structure.js";
 import { registerLayoutTools } from "../dist/tools/layout.js";
+import { registerTaxonomyTools } from "../dist/tools/taxonomy.js";
+import { registerDiscoveryTools } from "../dist/tools/discovery.js";
 
 const PROJECT = "staging";
 const handlers = new Map();
@@ -71,6 +73,8 @@ before(() => {
     registerTranslateTools,
     registerStructureTools,
     registerLayoutTools,
+    registerTaxonomyTools,
+    registerDiscoveryTools,
   ]) {
     register(server);
   }
@@ -306,6 +310,121 @@ test("delete_header_item: DELETE /admin/headers/{h}/items/{i}", async () => {
   await call("delete_header_item", { project: PROJECT, header_id: 6, item_id: 18 });
   assert.equal(lastCall().method, "DELETE");
   assert.ok(lastCall().url.endsWith("/admin/headers/6/items/18"));
+});
+
+// --- menu icons: header items and the categories a header menu lists -------
+
+test("add_header_item: the icon is sent as icon_media_id beside the translation", async () => {
+  const r = await call("add_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    language_id: 22,
+    label: "Hair Transplant",
+    url: "hair-transplant",
+    item_type: "custom_button",
+    icon_media_id: 41,
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/headers/6/items"));
+  const body = lastBody();
+  assert.equal(body.icon_media_id, 41);
+  assert.equal(body.translations[0].label, "Hair Transplant");
+
+  // No icon given: no key at all, so the item is created without one.
+  await call("add_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    language_id: 22,
+    label: "About",
+    url: "about",
+    item_type: "custom_button",
+  });
+  assert.ok(!("icon_media_id" in lastBody()));
+});
+
+test("update_header_item: icon_media_id null clears the icon, leaving it out keeps it", async () => {
+  const r = await call("update_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    icon_media_id: null,
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/headers/6/items/18"));
+  assert.deepEqual(lastBody(), { icon_media_id: null });
+
+  await call("update_header_item", { project: PROJECT, header_id: 6, item_id: 18, order: 2 });
+  assert.deepEqual(lastBody(), { order: 2 });
+
+  // The handler is called directly above; the schema must let null through too.
+  const icon = definitions.get("update_header_item").inputSchema.icon_media_id;
+  assert.ok(icon.safeParse(null).success);
+  assert.ok(icon.safeParse(undefined).success);
+  assert.ok(!icon.safeParse(1.5).success);
+});
+
+test("create_post_category: carries icon_media_id", async () => {
+  const r = await call("create_post_category", {
+    project: PROJECT,
+    name: "Hair Care",
+    slug: "hair-care",
+    order: 0,
+    icon_media_id: 7,
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/post-categories"));
+  assert.equal(lastBody().icon_media_id, 7);
+  assert.equal(lastBody().slug, "hair-care");
+});
+
+test("update_service_category / update_post_category: PUT only the icon", async () => {
+  const r = await call("update_service_category", {
+    project: PROJECT,
+    category_id: 12,
+    icon_media_id: 9,
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/service-categories/12"));
+  assert.deepEqual(lastBody(), { icon_media_id: 9 });
+  const out = JSON.parse(r.content[0].text);
+  assert.equal(out.category_id, 12);
+  assert.equal(out.icon_media_id, 9);
+
+  await call("update_post_category", { project: PROJECT, category_id: 4, icon_media_id: null });
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/post-categories/4"));
+  assert.deepEqual(lastBody(), { icon_media_id: null });
+});
+
+test("list_service_categories / list_post_categories: each category shows its icon_media_url", async () => {
+  const category = (id, icon) => ({
+    id,
+    parent_id: null,
+    icon_media_id: icon ? 9 : null,
+    icon_media_url: icon,
+    translations: [{ language: { id: 22, code: "en", name: "English" }, name: "FUE", slug: "fue" }],
+  });
+  const list = {
+    status: "success",
+    data: {
+      categories: [category(1, "/media/icons/fue.svg"), category(2, null)],
+      total: 2,
+      page: 1,
+      limit: 100,
+      total_pages: 1,
+    },
+  };
+  globalThis.fetch = routedFetch({ "/admin/service-categories": list, "/admin/post-categories": list });
+
+  for (const tool of ["list_service_categories", "list_post_categories"]) {
+    const out = JSON.parse((await call(tool, { project: PROJECT, limit: 100, page: 1 })).content[0].text);
+    assert.equal(out.categories[0].icon_media_url, "/media/icons/fue.svg", tool);
+    assert.equal(out.categories[1].icon_media_url, null, tool);
+  }
 });
 
 test("list_media: GET /admin/media with search params", async () => {

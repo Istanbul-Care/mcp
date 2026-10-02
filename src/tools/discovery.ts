@@ -151,6 +151,7 @@ export function registerDiscoveryTools(server: McpServer): void {
           total: response.data.total,
           categories: response.data.categories.map((category) => ({
             id: category.id,
+            icon_media_url: category.icon_media_url ?? null,
             translations: category.translations.map((translation) => ({
               language: translation.language.code,
               name: translation.name,
@@ -190,6 +191,7 @@ export function registerDiscoveryTools(server: McpServer): void {
           categories: response.data.categories.map((category) => ({
             id: category.id,
             parent_id: category.parent_id,
+            icon_media_url: category.icon_media_url ?? null,
             translations: category.translations.map((translation) => ({
               language: translation.language.code,
               name: translation.name,

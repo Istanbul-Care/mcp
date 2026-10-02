@@ -102,6 +102,7 @@ agent is doing the writing.
 | `translate_everything` / `_status` | ✓ | Brand-wide sweep, throttled |
 | `translation_worklist` / `save_translations` | ✓ | The surfaces no backend endpoint translates |
 | `create_post_category` / `add_category_translation` | ✓ | Create/translate a category |
+| `update_post_category` / `update_service_category` | ✓ | Set or remove a category's icon — shown beside it where a header menu lists categories |
 | `create_tag` / `add_tag_translation` | ✓ | Create/translate a tag |
 | `list_post_faqs` / `add_post_faq` / `add_faq_translation` / `delete_faq` | ✓ | A post's FAQ block + FAQPage schema |
 | `list_seo_schemas` / `set_post_seo_schema` | ✓ | Structured data (JSON-LD) |

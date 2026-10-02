@@ -30,6 +30,20 @@ interface CreatedItem {
   id: number;
 }
 
+/**
+ * A menu item's icon is a media row the site draws beside its label, in the
+ * header bar and in the dropdowns. On an update, null clears it and leaving
+ * the key out keeps it; an omitted key is undefined, which the JSON body
+ * drops, so it never reaches the API.
+ */
+const ICON_TEXT =
+  "Icon shown next to this item in the site header and its menus: a media id from " +
+  "upload_media (an SVG or PNG; square works best).";
+
+const CATEGORY_MENU_ICONS =
+  "In a category menu (item_type service_category or post_category) each listed category " +
+  "shows its own icon — set those with update_service_category / update_post_category.";
+
 export function registerHeaderTools(server: McpServer): void {
   server.registerTool(
     "list_headers",
@@ -66,7 +80,9 @@ export function registerHeaderTools(server: McpServer): void {
       description:
         "Adds a menu item to a header, with its label and link in ONE language. Nest under " +
         "another item with parent_id (for dropdowns). Add other languages with the " +
-        "translation tools (type 'header_item'). Requires login.",
+        "translation tools (type 'header_item'). " +
+        CATEGORY_MENU_ICONS +
+        " Requires login.",
       inputSchema: {
         project: projectParam,
         header_id: z.number().int().describe("From list_headers."),
@@ -91,10 +107,27 @@ export function registerHeaderTools(server: McpServer): void {
         parent_id: z.number().int().optional().describe("Parent item id, for dropdown children."),
         order: z.number().int().optional(),
         is_active: z.boolean().default(true),
+        icon_media_id: z
+          .number()
+          .int()
+          .nullable()
+          .optional()
+          .describe(`${ICON_TEXT} Leave it out for no icon.`),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
-    async ({ project, header_id, language_id, label, url, item_type, parent_id, order, is_active }) =>
+    async ({
+      project,
+      header_id,
+      language_id,
+      label,
+      url,
+      item_type,
+      parent_id,
+      order,
+      is_active,
+      icon_media_id,
+    }) =>
       guard(async () => {
         const badValue = ensureVocabulary([["header_item_type", item_type]]);
         if (badValue) return fail(badValue);
@@ -106,6 +139,7 @@ export function registerHeaderTools(server: McpServer): void {
             parent_id,
             order,
             is_active,
+            icon_media_id,
             translations: [{ language_id, label, url }],
           },
         );
@@ -118,8 +152,10 @@ export function registerHeaderTools(server: McpServer): void {
     {
       title: "Edit a navbar item's structure",
       description:
-        "Updates a menu item's structure — its type, order, active flag or parent. Text " +
-        "(label/url) is per-language: change it with the translation tools. Requires login.",
+        "Updates a menu item's structure — its type, order, active flag, parent or icon. Text " +
+        "(label/url) is per-language: change it with the translation tools. " +
+        CATEGORY_MENU_ICONS +
+        " Requires login.",
       inputSchema: {
         project: projectParam,
         header_id: z.number().int(),
@@ -128,6 +164,12 @@ export function registerHeaderTools(server: McpServer): void {
         order: z.number().int().optional(),
         is_active: z.boolean().optional(),
         parent_id: z.number().int().optional(),
+        icon_media_id: z
+          .number()
+          .int()
+          .nullable()
+          .optional()
+          .describe(`${ICON_TEXT} null removes it; leave it out to keep the current one.`),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
