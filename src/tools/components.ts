@@ -628,22 +628,6 @@ export function registerComponentTools(server: McpServer): void {
           .describe("Show a lead form inside the popup in place of its button (only while popup_enabled). After sending: " +
             "the popup's button link if it has one (a WhatsApp link opens straight away, no second form), " +
             "else a thank-you and the popup closes. Leave the button link empty for a form-only popup."),
-        google_rating: z
-          .number()
-          .min(0)
-          .max(5)
-          .nullable()
-          .optional()
-          .describe("The brand's Google review score (e.g. 4.9), shown as a badge above the spotlight hero's form; null hides the badge."),
-        google_reviews_url: z.string().nullable().optional().describe("Where the Google badge links (the brand's Google reviews page); full https link."),
-        trustpilot_rating: z
-          .number()
-          .min(0)
-          .max(5)
-          .nullable()
-          .optional()
-          .describe("The brand's Trustpilot score (e.g. 4.9), shown as a badge above the spotlight hero's form; null hides the badge."),
-        trustpilot_url: z.string().nullable().optional().describe("Where the Trustpilot badge links (the brand's Trustpilot page); full https link."),
         is_active: z.boolean().optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
