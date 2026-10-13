@@ -143,12 +143,17 @@ export function registerComponentTools(server: McpServer): void {
     {
       title: "Create a URL redirect",
       description:
-        "Adds a source→target URL redirect for a brand. Use relative paths (e.g. /old-page). " +
-        "Requires login.",
+        "Adds a source→target URL redirect for a brand. Give both addresses as a visitor " +
+        "sees them on the site, with the language prefix the site uses (none for the " +
+        "default language): /de/old-page/ → /de/new-page/. The backend stores the source " +
+        "as /v1/<lang>/pages/<path>, the form the site looks up; the reply shows it. " +
+        "Files (.pdf, .webp) and home pages can't be redirected. Requires login.",
       inputSchema: {
         project: projectParam,
-        source_url: z.string().describe("The old/incoming path, e.g. /old-slug."),
-        target_url: z.string().describe("Where it should go, e.g. /new-slug."),
+        source_url: z
+          .string()
+          .describe("The old address, e.g. /de/old-page/ or a full URL on the brand's site."),
+        target_url: z.string().describe("Where it should go, e.g. /de/new-page/."),
         method: redirectMethod.default("301"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -164,7 +169,7 @@ export function registerComponentTools(server: McpServer): void {
       inputSchema: {
         project: projectParam,
         redirect_id: z.number().int(),
-        source_url: z.string().optional(),
+        source_url: z.string().optional().describe("The old address, as in create_redirect."),
         target_url: z.string().optional(),
         method: redirectMethod.optional(),
       },
