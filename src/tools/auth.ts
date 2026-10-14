@@ -5,6 +5,7 @@ import { post } from "../api/client.js";
 import { getProject } from "../config/projects.js";
 import {
   challengeStatus,
+  MCP_SIGN_IN,
   clearSession,
   describeSessions,
   getChallenge,
@@ -157,7 +158,7 @@ export function registerAuthTools(server: McpServer): void {
         const response = await post<LoginResponse>(
           project,
           "/auth/login",
-          credentials,
+          { ...credentials, ...MCP_SIGN_IN },
           false,
         );
 
@@ -240,6 +241,7 @@ export function registerAuthTools(server: McpServer): void {
             password: pending.password,
             otp_code,
             otp_challenge_id: challengeId,
+            ...MCP_SIGN_IN,
           },
           false,
         );

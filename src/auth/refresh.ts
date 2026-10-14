@@ -17,7 +17,7 @@
  */
 
 import { getProject, type ProjectId } from "../config/projects.js";
-import { resolveCredentials, setSession, type AuthedUser } from "./session.js";
+import { MCP_SIGN_IN, resolveCredentials, setSession, type AuthedUser } from "./session.js";
 
 interface Authenticated {
   status: "authenticated";
@@ -58,7 +58,7 @@ export async function refreshToken(project: ProjectId): Promise<string | null> {
       const response = await fetch(`${apiBaseUrl.replace(/\/+$/, "")}/auth/login`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(credentials),
+        body: JSON.stringify({ ...credentials, ...MCP_SIGN_IN }),
         signal: AbortSignal.timeout(30_000),
       });
       if (!response.ok) return null;

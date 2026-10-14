@@ -25,6 +25,7 @@ import type { AddressInfo } from "node:net";
 
 import { PROJECT_IDS, getProject, type ProjectId } from "../config/projects.js";
 import {
+  MCP_SIGN_IN,
   setSession,
   getSession,
   getToken,
@@ -85,7 +86,7 @@ async function callLogin(project: ProjectId, body: unknown): Promise<LoginReply>
   const response = await fetch(`${apiBaseUrl.replace(/\/+$/, "")}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...(body as object), ...MCP_SIGN_IN }),
     signal: AbortSignal.timeout(30_000),
   });
   const text = await response.text();

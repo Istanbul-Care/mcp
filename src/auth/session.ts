@@ -281,3 +281,12 @@ export function resolveCredentials(
   }
   return { email: resolvedEmail, password: resolvedPassword };
 }
+
+/**
+ * Sent with every sign-in. The backend marks the token as the MCP's, and only
+ * the admin panel or such a token opens the admin API (backend
+ * app/middleware/panel_gate.py): a token lifted from the panel and used raw is
+ * refused.
+ */
+export const MCP_SIGN_IN = { client: "mcp" } as const;
+

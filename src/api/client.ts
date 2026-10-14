@@ -39,6 +39,16 @@ export class AuthRequiredError extends Error {
   }
 }
 
+/**
+ * The admin API answers only the admin panel and tokens this MCP signed in for
+ * (backend app/middleware/panel_gate.py). A session from before that rule, or a
+ * token not issued to the MCP, is refused with this until the next login.
+ */
+const NOT_AN_MCP_TOKEN = /admin panel or through the ic-content MCP/i;
+
+/** Lets the backend tell this MCP's calls apart in its logs. */
+const USER_AGENT = "ic-content-mcp";
+
 type Query = Record<string, string | number | boolean | undefined | null>;
 
 function buildUrl(project: ProjectId, path: string, query?: Query): string {
@@ -133,7 +143,7 @@ async function requestOnce<T>(
   const { query, body, auth = true, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const url = buildUrl(project, path, query);
 
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: "application/json", "User-Agent": USER_AGENT };
   if (auth) {
     let token = getToken(project);
     // No token at all is still worth a refresh attempt: the process may have
@@ -168,6 +178,12 @@ async function requestOnce<T>(
       throw new AuthRequiredError(project);
     }
     const detail = await extractDetail(response);
+    if (response.status === 403 && auth && NOT_AN_MCP_TOKEN.test(detail)) {
+      if (mayRefresh && (await refreshToken(project))) {
+        return requestOnce<T>(project, method, path, options, false);
+      }
+      throw new AuthRequiredError(project);
+    }
     // The brands share a JWT secret but not a users table, so a token borrowed
     // from another brand is accepted as genuine and then fails to resolve to
     // anyone here. The backend's wording for that ("User account has been
@@ -248,7 +264,7 @@ async function sendForm<T>(
   timeoutMs: number,
 ): Promise<T> {
   const url = buildUrl(project, path);
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: "application/json", "User-Agent": USER_AGENT };
   if (auth) {
     const token = getToken(project);
     if (!token) throw new AuthRequiredError(project);
@@ -264,7 +280,11 @@ async function sendForm<T>(
 
   if (!response.ok) {
     if (response.status === 401 && auth) throw new AuthRequiredError(project);
-    throw new ApiError(response.status, await extractDetail(response), url);
+    const detail = await extractDetail(response);
+    if (response.status === 403 && auth && NOT_AN_MCP_TOKEN.test(detail)) {
+      throw new AuthRequiredError(project);
+    }
+    throw new ApiError(response.status, detail, url);
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
