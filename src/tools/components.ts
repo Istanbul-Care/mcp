@@ -277,18 +277,20 @@ export function registerComponentTools(server: McpServer): void {
         style: z
           .string()
           .optional()
-          .describe("default | cinematic | editorial | premium | form | spotlight. 'form' puts the " +
+          .describe("default | cinematic | editorial | premium | form | spotlight | team. 'form' puts the " +
             "brand's contact form on a card beside the headline (the hero's own button is not shown). " +
             "'spotlight' puts the headline, the hero's button and up to four features over the " +
             "background, the side image (side_image_id) beside them when set, and the contact form " +
-            "as a strip below."),
+            "as a strip below. 'team' shows the icons as badges, the headline (*words* coloured), the " +
+            "subtitle (**words** bold), WhatsApp + the hero's button beside the side image (team photo) " +
+            "with the contact form in front of it."),
         background_image_id: z.number().int().optional(),
         mobile_background_image_id: z.number().int().optional(),
         side_image_id: z
           .number()
           .int()
           .optional()
-          .describe("A picture beside the text (the spotlight style), the same in every language."),
+          .describe("A picture beside the text (the spotlight and team styles), the same in every language."),
         features: heroFeature,
         icons: z
           .array(z.record(z.unknown()))

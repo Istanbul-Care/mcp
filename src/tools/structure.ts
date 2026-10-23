@@ -123,7 +123,7 @@ export function registerStructureTools(server: McpServer): void {
         .string()
         .optional()
         .describe(
-          "default | cinematic | editorial | premium | form | spotlight. 'form' puts the brand's " +
+          "default | cinematic | editorial | premium | form | spotlight | team. 'form' puts the brand's " +
             "contact form on a card beside the headline (the hero's own button is not shown). " +
             "'spotlight' puts the headline, the hero's button and up to four features over the " +
             "background, the side image (side_image_id) beside them when set, and the contact form " +

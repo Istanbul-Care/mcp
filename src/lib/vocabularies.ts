@@ -83,6 +83,14 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
           "Background photo behind the headline, the hero's button and up to four features; the side " +
           "image (side_image_id) beside them when set; the brand's contact form as a strip below.",
       },
+      {
+        value: "team",
+        note:
+          "The hero's icons as badges, the headline (*words* coloured), the subtitle (**words** bold), " +
+          "a WhatsApp button (the brand link) and the hero's own button (desktop only), beside the " +
+          "side image (the team's cut-out photo) with the brand's contact form in front of it. " +
+          "Features are not shown.",
+      },
     ],
     on_unknown: "Falls back to default.",
   },

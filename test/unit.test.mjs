@@ -252,9 +252,10 @@ test("checkVocabulary: rejects panel options the site never renders", () => {
   assert.equal(checkVocabulary("card_type", "media_slider").ok, true);
 });
 
-test("checkVocabulary: the form and spotlight heroes are real styles", () => {
+test("checkVocabulary: the form, spotlight and team heroes are real styles", () => {
   assert.equal(checkVocabulary("hero_style", "form").ok, true);
   assert.equal(checkVocabulary("hero_style", "spotlight").ok, true);
+  assert.equal(checkVocabulary("hero_style", "team").ok, true);
 });
 
 test("checkVocabulary: slider style is capitalised", () => {
