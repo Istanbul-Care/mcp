@@ -8,10 +8,8 @@
  * as nothing.
  *
  * The values here are the ones the **site** honours, which is not always what
- * the panel offers: card `media_slider` is selectable in the panel but has no
- * branch on the site, so it is listed as accepted with a warning rather than
- * silently recommended. (Hero `coverflow` was too, until the panel's option
- * became `form`.)
+ * the panel offers. (Hero `coverflow` was selectable in the panel but had no
+ * branch on the site, until the panel's option became `form`.)
  *
  * Site-side sources:
  *   CardSection.tsx · HeroesWrapper.tsx · Footer/index.tsx · Sliders.tsx
@@ -52,7 +50,7 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
       { value: "vertical_slider", label: "Vertical slider" },
       { value: "testimonial_gallery", label: "Testimonial gallery", note: "Media are consumed in pairs; an odd count leaves a gap." },
       { value: "word_cloud", label: "Why choose us", note: "Its description must be a JSON array of {title, description}." },
-      { value: "media_slider", label: "Logo row", note: "A row of logos (press, partners, awards): the title between two rules, the media side by side, a button at each end that slides the row on a click (no autoplay). Rendered by the site since 2026-10-01." },
+      { value: "media_slider", label: "Logo row", note: "A row of logos (press, partners, awards), media_ids being the logos. Two designs, picked by the card's dark_mode: false = design 1, the title between two rules and the logos in grey with a button at each end that slides the row on a click; true = design 2, the press strip in the hero's colour, made to sit right after the hero as its continuation: the title is a small uppercase heading (e.g. \"As seen in\"), the logos white and all one height, sliding slowly by themselves and stopping under the mouse. Rendered by the site since 2026-10-01 (design 2 since 2026-10-23)." },
     ],
     on_unknown: "Falls back to the plain image/text card.",
   },

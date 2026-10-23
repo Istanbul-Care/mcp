@@ -286,14 +286,22 @@ export function registerCardTools(server: McpServer): void {
           .optional()
           .describe(
             "Card style/type; see existing cards for values. 'media_slider' is the logo row " +
-              "(press, partners, awards): the title sits between two rules and media_ids are the " +
-              "logos, shown side by side with a button at each end that slides them on a click; " +
-              "it needs no description.",
+              "(press, partners, awards): media_ids are the logos and it needs no description. " +
+              "Its dark_mode picks the design: false = the title between two rules, the logos " +
+              "with a button at each end that slides them on a click; true = the press strip in " +
+              "the hero's colour for right after the hero (title as a small heading such as " +
+              "'As seen in', white logos sliding slowly by themselves).",
           ),
         image_id: z.number().int().optional(),
         media_ids: z.array(z.number().int()).optional(),
         sort_order: z.number().int().optional(),
-        dark_mode: z.boolean().optional(),
+        dark_mode: z
+          .boolean()
+          .optional()
+          .describe(
+            "Dark card. On a 'media_slider' (logo row) card it picks design 2, the press " +
+              "strip in the hero's colour that sits right after the hero.",
+          ),
         text_position: z.string().optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -333,7 +341,13 @@ export function registerCardTools(server: McpServer): void {
         image_id: z.number().int().optional(),
         media_ids: z.array(z.number().int()).optional(),
         sort_order: z.number().int().optional(),
-        dark_mode: z.boolean().optional(),
+        dark_mode: z
+          .boolean()
+          .optional()
+          .describe(
+            "Dark card. On a 'media_slider' (logo row) card it picks design 2, the press " +
+              "strip in the hero's colour that sits right after the hero.",
+          ),
         text_position: z.string().optional(),
         translation_update: z
           .object({

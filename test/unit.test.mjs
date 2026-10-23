@@ -252,6 +252,12 @@ test("checkVocabulary: rejects panel options the site never renders", () => {
   assert.equal(checkVocabulary("card_type", "media_slider").ok, true);
 });
 
+test("vocabulary: the logo row names its two designs (dark_mode picks)", () => {
+  const row = VOCABULARIES.card_type.values.find((v) => v.value === "media_slider");
+  assert.match(row.note, /dark_mode/);
+  assert.match(row.note, /right after the hero/);
+});
+
 test("checkVocabulary: the form, spotlight and team heroes are real styles", () => {
   assert.equal(checkVocabulary("hero_style", "form").ok, true);
   assert.equal(checkVocabulary("hero_style", "spotlight").ok, true);

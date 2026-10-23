@@ -266,8 +266,8 @@ anywhere. Two tools carry the rules:
   `modal-dialog-…` forms.
 - `get_vocabularies` — every field where only a listed value renders: card and
   hero styles, menu item types, link icons, media types, form field types. The
-  write tools reject a value the site cannot use, including two the admin panel
-  offers but the site never renders (`coverflow`, `media_slider`).
+  write tools reject a value the site cannot use, such as a style the admin
+  panel once offered but the site never rendered (`coverflow`).
 
 Parsed text columns are checked too: a word-cloud card's JSON badges, the
 pipe-separated focus keyword, ISO-4217 currencies, bare video ids for
