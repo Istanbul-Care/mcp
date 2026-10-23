@@ -129,7 +129,8 @@ export function registerDiscoveryTools(server: McpServer): void {
       title: "List blog categories",
       description:
         "Blog categories with every translation, so a draft can be filed under the right " +
-        "category ids. Requires login.",
+        "category ids, and each one's own sitemap (sitemap_name, sitemap_page_id) when it has " +
+        "one. Requires login.",
       inputSchema: {
         project: projectParam,
         search: z.string().optional(),
@@ -152,6 +153,8 @@ export function registerDiscoveryTools(server: McpServer): void {
           categories: response.data.categories.map((category) => ({
             id: category.id,
             icon_media_url: category.icon_media_url ?? null,
+            sitemap_name: category.sitemap_name ?? null,
+            sitemap_page_id: category.sitemap_page_id ?? null,
             translations: category.translations.map((translation) => ({
               language: translation.language.code,
               name: translation.name,

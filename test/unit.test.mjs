@@ -246,9 +246,10 @@ test("checkVocabulary: rejects a value the site has no branch for", () => {
 
 test("checkVocabulary: rejects panel options the site never renders", () => {
   // Selectable in the admin panel (coverflow was, until it became "form") but
-  // they fall through on the site.
-  assert.equal(checkVocabulary("card_type", "media_slider").ok, false);
+  // it falls through on the site. (media_slider used to be such a card type;
+  // the site renders it now, as the logo row.)
   assert.equal(checkVocabulary("hero_style", "coverflow").ok, false);
+  assert.equal(checkVocabulary("card_type", "media_slider").ok, true);
 });
 
 test("checkVocabulary: the form and spotlight heroes are real styles", () => {

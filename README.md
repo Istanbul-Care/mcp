@@ -89,7 +89,7 @@ agent is doing the writing.
 | `resolve_internal_link` | – | A slug/path/URL → its SEO-correct URL in one language |
 | `localize_content_links` | – | Rewrites every internal anchor in an HTML block |
 | `login` / `submit_otp` / `auth_status` / `logout` | – | Session handling |
-| `list_post_categories` | ✓ | Categories with all translations |
+| `list_post_categories` | ✓ | Categories with all translations, and each one's own sitemap (`sitemap_name`, `sitemap_page_id`) |
 | `list_service_categories` | ✓ | Service categories with all translations and their parent — the ids for a page's services section |
 | `list_tags` | ✓ | Tags with all translations |
 | `list_posts` | ✓ | Posts including drafts and scheduled |
@@ -102,13 +102,13 @@ agent is doing the writing.
 | `translate_everything` / `_status` | ✓ | Brand-wide sweep, throttled |
 | `translation_worklist` / `save_translations` | ✓ | The surfaces no backend endpoint translates |
 | `create_post_category` / `add_category_translation` | ✓ | Create/translate a category |
-| `update_post_category` / `update_service_category` | ✓ | Set or remove a category's icon — shown beside it where a header menu lists categories |
+| `update_post_category` / `update_service_category` | ✓ | Set or remove a category's icon — shown beside it where a header menu lists categories; `update_post_category` also gives a blog category its own sitemap (`sitemap_name`: its posts move to `<name>-sitemap.xml`; `sitemap_page_id`: the page listing them, which heads that sitemap) |
 | `create_tag` / `add_tag_translation` | ✓ | Create/translate a tag |
 | `list_post_faqs` / `add_post_faq` / `add_faq_translation` / `delete_faq` | ✓ | A post's FAQ block + FAQPage schema |
 | `list_seo_schemas` / `set_post_seo_schema` | ✓ | Structured data (JSON-LD) |
 | `read_public_page` | – | A published page by slug path, with its real body HTML and full section payloads |
 | `list_pages` / `get_page` | ✓ | Pages with translations / one page's structure and SEO fields |
-| `create_page` / `update_page` | ✓ | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body; both also switch the page's sticky WhatsApp button (`sticky_whatsapp`: on/off + a link per language); `update_page` sets the services section's `style` (1: tall cards with category tabs, 2: categories side by side) and `category_ids` (only those, in that order) |
+| `create_page` / `update_page` | ✓ | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body; both also switch the page's sticky WhatsApp button (`sticky_whatsapp`: on/off + a link per language); `update_page` sets the services section's `style` (1: tall cards with category tabs, 2: categories side by side) and `category_ids` (only those, in that order), and the blog listing's `style` (1: two-column cards, 2: editorial list, 3: magazine with load more, 4: small cards) |
 | `fold_page_cards` | ✓ | Move a page's prose cards into its `page_content` body, byte for byte (previews by default) |
 | `set_page_content` | ✓ | Write a page's body HTML for one language + enable/position the `page_content` block |
 | `get_card` / `get_page_cards` | ✓ | One card in full / a page's cards in render order, with their text and images |

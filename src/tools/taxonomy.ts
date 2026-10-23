@@ -28,6 +28,39 @@ const categoryIconUpdate = z
   .nullable()
   .describe(`${CATEGORY_ICON_TEXT} null removes it.`);
 
+/**
+ * A blog category can have a sitemap of its own (Ali, 2026-10-22): its posts
+ * leave posts-sitemap.xml for <sitemap_name>-sitemap.xml, and its list page
+ * (e.g. the News page) leaves pages-sitemap.xml to head that sitemap.
+ */
+const RESERVED_SITEMAP_NAMES = ["pages", "posts", "services", "image", "video", "blogs"];
+
+const sitemapNameUpdate = z
+  .string()
+  .max(40)
+  .regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/, "lowercase letters, digits and hyphens")
+  .refine((name) => !RESERVED_SITEMAP_NAMES.includes(name), {
+    message: `not one of the site's own sitemaps (${RESERVED_SITEMAP_NAMES.join(", ")})`,
+  })
+  .nullable()
+  .describe(
+    "Gives the category's posts a sitemap of their own, <name>-sitemap.xml (e.g. 'news'), and " +
+      "takes them out of posts-sitemap.xml. Lowercase letters, digits and hyphens; categories " +
+      "may share a name. null or '' puts the posts back in the posts sitemap.",
+  );
+
+const sitemapPageUpdate = z
+  .number()
+  .int()
+  .positive()
+  .nullable()
+  .describe(
+    "The page that lists the category's posts (a page id, e.g. the News page). With a sitemap " +
+      "name it leaves pages-sitemap.xml and comes first in the category's own sitemap, in every " +
+      "language it is indexable in — so that sitemap exists even before any post is indexable. " +
+      "null removes it.",
+  );
+
 interface CreatedCategory {
   id: number;
 }
@@ -62,6 +95,8 @@ export function registerTaxonomyTools(server: McpServer): void {
           .nullable()
           .optional()
           .describe(`${CATEGORY_ICON_TEXT} Leave it out for no icon.`),
+        sitemap_name: sitemapNameUpdate.optional(),
+        sitemap_page_id: sitemapPageUpdate.optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
@@ -85,19 +120,34 @@ export function registerTaxonomyTools(server: McpServer): void {
 
   registerWrite(server, {
     name: "update_post_category",
-    title: "Set a blog category's icon",
+    title: "Set a blog category's icon and sitemap",
     description:
       "Sets or removes a blog category's icon — the picture beside its name where a header " +
-      "menu lists blog categories (a header item of item_type post_category). Names and " +
+      "menu lists blog categories (a header item of item_type post_category) — and its own " +
+      "sitemap: sitemap_name (its posts leave posts-sitemap.xml for <name>-sitemap.xml) and " +
+      "sitemap_page_id (the page listing them, which then heads that sitemap). Only the fields " +
+      "you pass change; every sitemap is rebuilt when the sitemap fields change. Names and " +
       "slugs are per-language: change them with the translation tools (type 'post_category').",
     params: {
       category_id: z.number().int().describe("From list_post_categories."),
-      icon_media_id: categoryIconUpdate,
+      icon_media_id: categoryIconUpdate.optional(),
+      sitemap_name: sitemapNameUpdate.optional(),
+      sitemap_page_id: sitemapPageUpdate.optional(),
     },
+    checks: (a) =>
+      a.icon_media_id === undefined &&
+      a.sitemap_name === undefined &&
+      a.sitemap_page_id === undefined
+        ? "Nothing to change: pass icon_media_id, sitemap_name or sitemap_page_id."
+        : null,
     method: "put",
     path: (a) => `/admin/post-categories/${a.category_id}`,
-    body: (a) => ({ icon_media_id: a.icon_media_id }),
-    echo: ["category_id", "icon_media_id"],
+    body: (a) => ({
+      icon_media_id: a.icon_media_id,
+      sitemap_name: a.sitemap_name === "" ? null : a.sitemap_name,
+      sitemap_page_id: a.sitemap_page_id,
+    }),
+    echo: ["category_id", "icon_media_id", "sitemap_name", "sitemap_page_id"],
   });
 
   registerWrite(server, {

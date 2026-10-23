@@ -273,6 +273,14 @@ const servicesFlagParam = featureFlagParam
 
 const blogsFlagParam = featureFlagParam
   .extend({
+    style: z
+      .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
+      .optional()
+      .describe(
+        "1 (default): two-column cards, numbered pages. 2: editorial list, previous/next. " +
+          "3: magazine (a lead post, then two, then three to a row), 'Load more posts'. " +
+          "4: small cards, four to a row, bare page numbers.",
+      ),
     author_id: z.number().int().nullable().optional(),
     limit: z.number().int().min(1).optional(),
     query_parameters: z
@@ -284,7 +292,10 @@ const blogsFlagParam = featureFlagParam
           "effect. A malformed value does not error; the list simply comes back unfiltered.",
       ),
   })
-  .describe("The blog listing block.");
+  .describe(
+    "The blog listing block. The object you pass REPLACES the stored one, so send style each " +
+      "time — read get_page (feature_blocks.blogs) first, or it falls back to style 1.",
+  );
 
 const reviewsFlagParam = featureFlagParam
   .extend({

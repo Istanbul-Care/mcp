@@ -122,6 +122,10 @@ export interface PostCategoryListItem {
   /** The icon a header category menu shows beside this category; null when none. */
   icon_media_id?: number | null;
   icon_media_url?: string | null;
+  /** Its posts' own sitemap, <name>-sitemap.xml; null when they are in the posts sitemap. */
+  sitemap_name?: string | null;
+  /** The page listing its posts, which heads that sitemap. */
+  sitemap_page_id?: number | null;
   translations: PostCategoryTranslation[];
   created_at: string;
   updated_at: string;

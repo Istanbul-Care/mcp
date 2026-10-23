@@ -195,6 +195,16 @@ test("update_page: the services section takes a style and its categories", async
   assert.deepEqual(JSON.parse(r.content[0].text).changed, ["services"]);
 });
 
+test("update_page: the blog listing takes a style 1 to 4", async () => {
+  const blogs = { enabled: true, order: 4, grid_columns: 12, style: 3, query_parameters: "category_id=14" };
+  const r = await call("update_page", { project: PROJECT, page_id: 223, blogs });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().blogs, blogs);
+  const schema = definitions.get("update_page").inputSchema.blogs;
+  assert.ok(schema.safeParse({ enabled: true, style: 4 }).success);
+  assert.ok(!schema.safeParse({ enabled: true, style: 5 }).success);
+});
+
 test("update_page: the services section accepts only style 1 or 2 and category ids", () => {
   const services = definitions.get("update_page").inputSchema.services;
   assert.ok(services.safeParse({ enabled: true, style: 2, category_ids: [4] }).success);
@@ -398,6 +408,30 @@ test("update_service_category / update_post_category: PUT only the icon", async 
   assert.equal(lastCall().method, "PUT");
   assert.ok(lastCall().url.endsWith("/admin/post-categories/4"));
   assert.deepEqual(lastBody(), { icon_media_id: null });
+});
+
+test("update_post_category: the own sitemap fields, only those passed", async () => {
+  let r = await call("update_post_category", {
+    project: PROJECT,
+    category_id: 14,
+    sitemap_name: "news",
+    sitemap_page_id: 223,
+  });
+  assert.ok(!isError(r));
+  assert.ok(lastCall().url.endsWith("/admin/post-categories/14"));
+  assert.deepEqual(lastBody(), { sitemap_name: "news", sitemap_page_id: 223 });
+
+  await call("update_post_category", { project: PROJECT, category_id: 14, sitemap_name: "" });
+  assert.deepEqual(lastBody(), { sitemap_name: null });
+
+  r = await call("update_post_category", { project: PROJECT, category_id: 14 });
+  assert.ok(isError(r));
+
+  const name = definitions.get("update_post_category").inputSchema.sitemap_name;
+  assert.ok(name.safeParse("press-room").success);
+  assert.ok(!name.safeParse("posts").success);
+  assert.ok(!name.safeParse("News").success);
+  assert.ok(!name.safeParse("a_b").success);
 });
 
 test("list_service_categories / list_post_categories: each category shows its icon_media_url", async () => {
