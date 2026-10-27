@@ -121,6 +121,9 @@ interface PageContentBlock {
 interface StickyWhatsApp {
   enabled: boolean;
   urls: Record<string, string>;
+  /** 1 the round button; 2 the phone bar (graft calculator + WhatsApp). */
+  style?: number;
+  calculator_page_id?: number | null;
 }
 
 /** How a page shows its header — chosen per page, classic by default. */
@@ -421,6 +424,27 @@ const stickyWhatsAppParam = z
       .describe(
         "Language code -> WhatsApp link, e.g. {\"en\": \"https://destakesk.github.io/<brand>-web-english/\", " +
           "\"it\": \"…-web-italiano/\"}. A language left out shows no button on that language's page.",
+      ),
+    style: z
+      .number()
+      .int()
+      .min(1)
+      .max(2)
+      .optional()
+      .describe(
+        "1 (default) the round button in the corner. 2 on phones a bar along the bottom of the screen: " +
+          "the graft calculator page (calculator_page_id) on the left, WhatsApp on the right; computers " +
+          "keep the round button. On the calculator page itself the bar shows WhatsApp only.",
+      ),
+    calculator_page_id: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional()
+      .describe(
+        "Style 2: the id of the page the bar's left button opens, in the visitor's language " +
+          "(the brand's graft calculator page, e.g. tools/hair-graft-calculator). Without one the bar shows WhatsApp only.",
       ),
   })
   .describe(
