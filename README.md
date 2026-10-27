@@ -114,6 +114,7 @@ agent is doing the writing.
 | `get_card` / `get_page_cards` | ✓ | One card in full / a page's cards in render order, with their text and images |
 | `get_component` | ✓ | One hero/slider/package/footer/form in full, with every child id |
 | `update_hero` / `update_slider` / `update_process` / `update_price_compare` / `update_promotional_landing` / `update_before_after` | ✓ | Edit a component after it exists |
+| `create_process` / `update_process` / `update_process_translation` / `create_process_step` / `update_process_step` | ✓ | A "how it works" block: `style` 1 (the recovery roadmap) or 2 (the v8 journey on the brand's navy: `eyebrow` over the title, a straight line of numbered steps, each a card with its photo); a step's photo (`image_id`) is the step's, the same in every language; inline steps on `create_process` carry their first-language text flat (`title`, `description`, `icon`) |
 | `create_hero_feature` / `create_slide` / `create_slide_feature` / `create_process_step` / `create_price_compare_country` / `create_promo_feature` / `create_gallery_item` | ✓ | Add one child row (each with `update_*` and `delete_*`) |
 | `create_package_section` / `create_offer` | ✓ | Build a pricing table tier by tier (price and currency are per-language) |
 | `list_links` / `create_link` / `update_link` / `delete_link` | ✓ | The reusable CTA buttons other blocks point at |

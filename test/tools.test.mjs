@@ -1612,3 +1612,149 @@ test("save_translations: a header item's mega texts are written with its label",
     language_id: 45,
   });
 });
+
+// --- processes: the v8 journey (style 2), its eyebrow and the steps' photos ---
+
+test("create_process: style, eyebrow and flat inline steps with their photos go as given", async () => {
+  const r = await call("create_process", {
+    project: PROJECT,
+    language_id: 22,
+    title: "Your journey in Istanbul",
+    eyebrow: "YOUR JOURNEY",
+    button_text: "Free consultation",
+    button_url: "consultation",
+    style: 2,
+    steps: [
+      { step_number: 1, title: "Consultation", description: "Online, free", image_id: 61 },
+      { step_number: 2, sort_order: 1, title: "Arrival", icon: "solar:airplane-outline" },
+    ],
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/processes"));
+  const body = lastBody();
+  assert.equal(body.style, 2);
+  assert.equal(body.eyebrow, "YOUR JOURNEY");
+  assert.deepEqual(body.steps, [
+    { step_number: 1, title: "Consultation", description: "Online, free", image_id: 61 },
+    { step_number: 2, sort_order: 1, title: "Arrival", icon: "solar:airplane-outline" },
+  ]);
+
+  // Neither given: no keys, so the backend's defaults (style 1, no eyebrow) apply.
+  await call("create_process", { project: PROJECT, language_id: 22, title: "Recovery" });
+  assert.ok(!("style" in lastBody()));
+  assert.ok(!("eyebrow" in lastBody()));
+});
+
+test("create_process: the schema takes style 1 or 2 and steps with their own title", () => {
+  const { style, steps, eyebrow } = definitions.get("create_process").inputSchema;
+  assert.ok(style.safeParse(1).success);
+  assert.ok(style.safeParse(2).success);
+  assert.ok(!style.safeParse(3).success);
+  assert.ok(!style.safeParse("2").success);
+  assert.ok(!eyebrow.safeParse("x".repeat(101)).success);
+  assert.ok(steps.safeParse([{ step_number: 1, title: "Consultation", image_id: 5 }]).success);
+  // The API reads a step's text flat; a nested translation left the step blank.
+  assert.ok(!steps.safeParse([{ step_number: 1, translation: { title: "Consultation" } }]).success);
+  assert.ok(!steps.safeParse([{ step_number: 0, title: "x" }]).success);
+});
+
+test("update_process: style sent when given, left out keeps it", async () => {
+  const r = await call("update_process", { project: PROJECT, process_id: 4, style: 2 });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/processes/4"));
+  assert.deepEqual(lastBody(), { style: 2 });
+
+  await call("update_process", { project: PROJECT, process_id: 4, sort_order: 3 });
+  assert.deepEqual(lastBody(), { sort_order: 3 });
+
+  const style = definitions.get("update_process").inputSchema.style;
+  assert.ok(style.safeParse(undefined).success);
+  assert.ok(!style.safeParse(3).success);
+});
+
+test("update_process_translation: eyebrow set when given, null or '' clears it, left out keeps it", async () => {
+  const r = await call("update_process_translation", {
+    project: PROJECT,
+    process_id: 4,
+    language_id: 22,
+    eyebrow: "YOUR JOURNEY",
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/processes/4/translations/22"));
+  assert.deepEqual(lastBody(), { eyebrow: "YOUR JOURNEY" });
+
+  await call("update_process_translation", { project: PROJECT, process_id: 4, language_id: 22, eyebrow: null });
+  assert.deepEqual(lastBody(), { eyebrow: null });
+  await call("update_process_translation", { project: PROJECT, process_id: 4, language_id: 22, eyebrow: "" });
+  assert.deepEqual(lastBody(), { eyebrow: "" });
+  await call("update_process_translation", { project: PROJECT, process_id: 4, language_id: 22, title: "Journey" });
+  assert.deepEqual(lastBody(), { title: "Journey" });
+
+  const eyebrow = definitions.get("update_process_translation").inputSchema.eyebrow;
+  assert.ok(eyebrow.safeParse(null).success);
+  assert.ok(!eyebrow.safeParse("x".repeat(101)).success);
+});
+
+test("create_process_step / update_process_step: the photo sent when given, null removes it, left out keeps it", async () => {
+  let r = await call("create_process_step", { project: PROJECT, process_id: 4, step_number: 3, image_id: 61 });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/processes/4/steps"));
+  assert.deepEqual(lastBody(), { step_number: 3, image_id: 61 });
+
+  await call("create_process_step", { project: PROJECT, process_id: 4, step_number: 4 });
+  assert.deepEqual(lastBody(), { step_number: 4 });
+
+  r = await call("update_process_step", { project: PROJECT, step_id: 9, image_id: 62 });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/processes/steps/9"));
+  assert.deepEqual(lastBody(), { image_id: 62 });
+
+  await call("update_process_step", { project: PROJECT, step_id: 9, image_id: null });
+  assert.deepEqual(lastBody(), { image_id: null });
+
+  await call("update_process_step", { project: PROJECT, step_id: 9, sort_order: 2 });
+  assert.deepEqual(lastBody(), { sort_order: 2 });
+
+  const image = definitions.get("update_process_step").inputSchema.image_id;
+  assert.ok(image.safeParse(null).success);
+  assert.ok(!image.safeParse(1.5).success);
+});
+
+const PROCESS_V8 = {
+  id: 4,
+  sort_order: 0,
+  style: 2,
+  image: null,
+  translations: [
+    { id: 1, language: { id: 22, code: "en" }, title: "Your journey", eyebrow: "YOUR JOURNEY", button_text: null, button_url: null },
+  ],
+  steps: [
+    {
+      id: 9,
+      step_number: 1,
+      sort_order: 0,
+      image_id: 61,
+      image: { id: 61, url: "/media/steps/consultation.webp" },
+      translations: [{ id: 3, language: { id: 22, code: "en" }, title: "Consultation", description: null, icon: null }],
+    },
+  ],
+};
+
+test("get_component / list_processes: a process shows its style, eyebrow and step photos", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/processes/4": { status: "success", data: PROCESS_V8 },
+    "/admin/processes": { status: "success", data: { processes: [PROCESS_V8], total: 1 } },
+  });
+  const full = JSON.parse(
+    (await call("get_component", { project: PROJECT, component: "process", component_id: 4 })).content[0].text,
+  );
+  assert.deepEqual(full.data, PROCESS_V8);
+
+  const list = JSON.parse((await call("list_processes", { project: PROJECT, limit: 50 })).content[0].text);
+  assert.equal(list.data.processes[0].style, 2);
+});

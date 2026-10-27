@@ -17,6 +17,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { get, post, put, del } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
 import { ok, fail, guard, projectParam, ensureVocabulary } from "./helpers.js";
+import {
+  PROCESS_EYEBROW_TEXT,
+  PROCESS_STEP_IMAGE_TEXT,
+  PROCESS_STYLE_TEXT,
+  processStyleParam,
+} from "./process-fields.js";
 
 /**
  * Create responses come in two shapes: most wrap the new row under `data`
@@ -369,6 +375,18 @@ export function registerComponentTools(server: McpServer): void {
   // ---- Processes ---------------------------------------------------------
   registerListDelete(server, { entity: "process", collection: "processes", label: "process sections" });
 
+  // The API reads each inline step flat — its first-language text sits beside
+  // its number, not under a `translation` key (which it silently ignores, so
+  // the step came out blank). An image_id left out stays out of the body.
+  const processStep = z.object({
+    step_number: z.number().int().min(1),
+    sort_order: z.number().int().min(0).optional(),
+    title: z.string().min(1).max(255),
+    description: z.string().optional(),
+    icon: z.string().max(255).optional().describe("An Iconify name, e.g. 'solar:stethoscope-outline'."),
+    image_id: z.number().int().optional().describe(PROCESS_STEP_IMAGE_TEXT),
+  });
+
   server.registerTool(
     "create_process",
     {
@@ -382,13 +400,18 @@ export function registerComponentTools(server: McpServer): void {
         description: z.string().optional(),
         button_text: z.string().optional(),
         button_url: z.string().optional(),
+        eyebrow: z.string().max(100).optional().describe(PROCESS_EYEBROW_TEXT),
         language_id: z.number().int().optional(),
         sort_order: z.number().int().optional(),
         image_id: z.number().int().optional(),
+        style: processStyleParam.optional().describe(`${PROCESS_STYLE_TEXT} Defaults to 1.`),
         steps: z
-          .array(z.record(z.unknown()))
+          .array(processStep)
           .optional()
-          .describe("Inline steps: [{ step_number*, sort_order?, translation? }]."),
+          .describe(
+            "Inline steps, each with its first-language text: [{ step_number, sort_order?, " +
+              "title, description?, icon?, image_id? }].",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },

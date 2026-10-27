@@ -37,6 +37,12 @@ import {
   type WriteArgs,
 } from "./helpers.js";
 import { checkCurrency, ensureFormats } from "../lib/field-formats.js";
+import {
+  PROCESS_EYEBROW_TEXT,
+  PROCESS_STEP_IMAGE_TEXT,
+  PROCESS_STYLE_TEXT,
+  processStyleParam,
+} from "./process-fields.js";
 
 const languageId = z
   .number()
@@ -499,22 +505,27 @@ export function registerStructureTools(server: McpServer): void {
   registerWrite(server, {
     name: "update_process",
     title: "Update a process section",
-    description: "Changes a process block's image or position. Text is per-language.",
+    description:
+      "Changes a process block's style, image or position. Text is per-language " +
+      "(update_process_translation); a step's photo is set on the step (update_process_step).",
     params: {
       process_id: z.number().int(),
       sort_order: sortOrder,
       image_id: z.number().int().optional(),
+      style: processStyleParam
+        .optional()
+        .describe(`${PROCESS_STYLE_TEXT} Leave it out to keep the current one.`),
     },
     method: "put",
     path: (a) => `/admin/processes/${a.process_id}`,
-    body: (a) => ({ sort_order: a.sort_order, image_id: a.image_id }),
+    body: (a) => ({ sort_order: a.sort_order, image_id: a.image_id, style: a.style }),
     echo: ["process_id"],
   });
 
   registerWrite(server, {
     name: "update_process_translation",
     title: "Update a process section's text",
-    description: "Rewrites one language of a process block's heading and button.",
+    description: "Rewrites one language of a process block's heading, eyebrow and button.",
     params: {
       process_id: z.number().int(),
       language_id: languageId,
@@ -522,6 +533,12 @@ export function registerStructureTools(server: McpServer): void {
       description: z.string().optional(),
       button_text: z.string().optional(),
       button_url: z.string().optional(),
+      eyebrow: z
+        .string()
+        .max(100)
+        .nullable()
+        .optional()
+        .describe(`${PROCESS_EYEBROW_TEXT} null or '' clears it; leave it out to keep it.`),
     },
     method: "put",
     path: (a) => `/admin/processes/${a.process_id}/translations/${a.language_id}`,
@@ -530,6 +547,7 @@ export function registerStructureTools(server: McpServer): void {
       description: a.description,
       button_text: a.button_text,
       button_url: a.button_url,
+      eyebrow: a.eyebrow,
     }),
     echo: ["process_id", "language_id"],
   });
@@ -538,17 +556,18 @@ export function registerStructureTools(server: McpServer): void {
     name: "create_process_step",
     title: "Add a step to a process section",
     description:
-      "Adds a numbered step. The step row itself carries only its number and position — " +
-      "follow this with create_process_step_translation for the wording, or the step renders " +
-      "blank.",
+      "Adds a numbered step. The step row itself carries only its number, position and photo " +
+      "— follow this with create_process_step_translation for the wording, or the step " +
+      "renders blank.",
     params: {
       process_id: z.number().int(),
       step_number: z.number().int().min(1),
       sort_order: sortOrder,
+      image_id: z.number().int().optional().describe(PROCESS_STEP_IMAGE_TEXT),
     },
     method: "post",
     path: (a) => `/admin/processes/${a.process_id}/steps`,
-    body: (a) => ({ step_number: a.step_number, sort_order: a.sort_order }),
+    body: (a) => ({ step_number: a.step_number, sort_order: a.sort_order, image_id: a.image_id }),
     echo: ["process_id"],
   });
 
@@ -594,15 +613,21 @@ export function registerStructureTools(server: McpServer): void {
   registerWrite(server, {
     name: "update_process_step",
     title: "Update a process step",
-    description: "Changes a step's number or position.",
+    description: "Changes a step's number, position or photo.",
     params: {
       step_id: z.number().int(),
       step_number: z.number().int().min(1).optional(),
       sort_order: sortOrder,
+      image_id: z
+        .number()
+        .int()
+        .nullable()
+        .optional()
+        .describe(`${PROCESS_STEP_IMAGE_TEXT} null removes it; leave it out to keep it.`),
     },
     method: "put",
     path: (a) => `/admin/processes/steps/${a.step_id}`,
-    body: (a) => ({ step_number: a.step_number, sort_order: a.sort_order }),
+    body: (a) => ({ step_number: a.step_number, sort_order: a.sort_order, image_id: a.image_id }),
     echo: ["step_id"],
   });
 

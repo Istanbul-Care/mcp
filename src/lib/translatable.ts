@@ -317,7 +317,7 @@ export const SURFACES: TranslatableSurface[] = [
     source: { path: "/admin/processes", key: "processes" },
     write: endpoint("/admin/processes"),
     titleField: "title",
-    fields: [t("title"), t("description"), t("button_text"), url("button_url")],
+    fields: [t("title"), t("description"), t("button_text"), url("button_url"), t("eyebrow", 100)],
   },
   {
     type: "process_step",

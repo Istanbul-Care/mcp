@@ -304,6 +304,16 @@ test("registry: a header item's mega texts are translated, within the backend's 
   assert.equal(byName.cta_label.maxLength, 100);
 });
 
+test("registry: a process's eyebrow is translated, and a step's photo is not a translation field", () => {
+  const process = getSurface("process");
+  const eyebrow = process.fields.find((f) => f.name === "eyebrow");
+  assert.ok(eyebrow);
+  assert.equal(eyebrow.kind, "text");
+  assert.equal(eyebrow.maxLength, 100);
+  // image_id lives on the step row, the same in every language.
+  assert.ok(!getSurface("process_step").fields.some((f) => f.name === "image_id"));
+});
+
 test("checkVocabulary: an empty or unknown field never blocks a write", () => {
   assert.equal(checkVocabulary("card_type", "").ok, true);
   assert.equal(checkVocabulary("card_type", undefined).ok, true);
