@@ -124,18 +124,22 @@ interface StickyWhatsApp {
 }
 
 /** How a page shows its header — chosen per page, classic by default. */
+const HEADER_STYLES = ["classic", "transparent", "mega"] as const;
 const headerStyleParam = z
-  .enum(["classic", "transparent"])
+  .enum(HEADER_STYLES)
   .describe(
     "The page's header design: 'classic' = the brand bar (default); 'transparent' = no " +
       "background over the page's opening picture (hero or breadcrumb banner image), the " +
       "brand background coming in once the visitor scrolls. A page that does not open on " +
-      "such a picture shows the transparent design with its background from the start.",
+      "such a picture shows the transparent design with its background from the start. " +
+      "'mega' = the transparent bar with a mega menu: hovering a top-level item opens a " +
+      "floating card under the bar with its sub-items, laid out by the items' mega_display, " +
+      "image_media_id and mega texts (see add_header_item / update_header_item).",
   );
 
 interface PageDetail extends PageListItem, PageSections {
   header_id?: number | null;
-  header_style?: "classic" | "transparent" | null;
+  header_style?: (typeof HEADER_STYLES)[number] | null;
   footer_id?: number | null;
   featured_image_id?: number | null;
   page_content?: PageContentBlock | null;

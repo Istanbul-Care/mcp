@@ -73,7 +73,8 @@ menu or the top footer sections, where they 404 — except that a header button
 (a menu item with \`button_style\`) opens \`consultation\` and \`modal-dialog-…\` forms.
 
 **Fixed vocabularies.** Card type, hero/footer/slider/before-after/FAQ style,
-menu item type, link icon, media type, form field type. Call get_vocabularies;
+page header design, menu item type, header button style, mega menu display,
+link icon, media type, form field type. Call get_vocabularies;
 the write tools reject a value the site cannot render.
 
 **Position that carries meaning.**

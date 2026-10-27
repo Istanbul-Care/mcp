@@ -24,6 +24,7 @@ import { registerStructureTools } from "../dist/tools/structure.js";
 import { registerLayoutTools } from "../dist/tools/layout.js";
 import { registerTaxonomyTools } from "../dist/tools/taxonomy.js";
 import { registerDiscoveryTools } from "../dist/tools/discovery.js";
+import { VOCABULARIES } from "../dist/lib/vocabularies.js";
 
 const PROJECT = "staging";
 const handlers = new Map();
@@ -526,7 +527,7 @@ test("add_header_item / update_header_item: the button fields take their listed 
   // The handlers are called directly above; the schemas must let these through too.
   for (const tool of ["add_header_item", "update_header_item"]) {
     const { button_style, button_show_on } = definitions.get(tool).inputSchema;
-    for (const value of ["filled", "green", "outline", null, undefined]) {
+    for (const value of ["filled", "green", "outline", "icon", null, undefined]) {
       assert.ok(button_style.safeParse(value).success, `${tool} button_style ${value}`);
     }
     for (const value of ["both", "mobile", "desktop", null, undefined]) {
@@ -536,6 +537,240 @@ test("add_header_item / update_header_item: the button fields take their listed 
     assert.ok(!button_style.safeParse("").success, tool);
     assert.ok(!button_show_on.safeParse("tablet").success, tool);
   }
+});
+
+// --- the mega header design: a photo, how an item shows, and its texts -------
+
+test("add_header_item: the mega fields go beside the item, the mega texts in its translation", async () => {
+  const r = await call("add_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    language_id: 22,
+    label: "Hair Transplant",
+    url: "hair-transplant",
+    item_type: "custom_button",
+    parent_id: 17,
+    image_media_id: 52,
+    mega_display: "feature",
+    description: "FUE and DHI with a lifetime guarantee",
+    cta_label: "See prices →",
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/headers/6/items"));
+  const body = lastBody();
+  assert.equal(body.image_media_id, 52);
+  assert.equal(body.mega_display, "feature");
+  assert.deepEqual(body.translations, [
+    {
+      language_id: 22,
+      label: "Hair Transplant",
+      url: "hair-transplant",
+      description: "FUE and DHI with a lifetime guarantee",
+      cta_label: "See prices →",
+    },
+  ]);
+
+  // None given: no keys at all, so the item is created as before.
+  await call("add_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    language_id: 22,
+    label: "About",
+    url: "about",
+    item_type: "custom_button",
+  });
+  const plain = lastBody();
+  for (const key of ["image_media_id", "mega_display"]) assert.ok(!(key in plain), key);
+  assert.deepEqual(plain.translations, [{ language_id: 22, label: "About", url: "about" }]);
+});
+
+test("update_header_item: image_media_id and mega_display sent when given, null clears them, leaving them out keeps them", async () => {
+  const r = await call("update_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    image_media_id: 52,
+    mega_display: "tile",
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/headers/6/items/18"));
+  assert.deepEqual(lastBody(), { image_media_id: 52, mega_display: "tile" });
+
+  // null: no photo, and automatic display again.
+  await call("update_header_item", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    image_media_id: null,
+    mega_display: null,
+  });
+  assert.deepEqual(lastBody(), { image_media_id: null, mega_display: null });
+
+  await call("update_header_item", { project: PROJECT, header_id: 6, item_id: 18, order: 2 });
+  assert.deepEqual(lastBody(), { order: 2 });
+});
+
+test("add_header_item / update_header_item: mega_display takes exactly the vocabulary's values or null", () => {
+  const values = VOCABULARIES.header_mega_display.values.map((v) => v.value);
+  assert.deepEqual(values, ["column", "promo", "feature", "tile", "link"]);
+  for (const tool of ["add_header_item", "update_header_item"]) {
+    const { mega_display, image_media_id } = definitions.get(tool).inputSchema;
+    for (const value of [...values, null, undefined]) {
+      assert.ok(mega_display.safeParse(value).success, `${tool} mega_display ${value}`);
+    }
+    assert.ok(!mega_display.safeParse("grid").success, tool);
+    assert.ok(!mega_display.safeParse("").success, tool);
+    assert.ok(image_media_id.safeParse(null).success, tool);
+    assert.ok(!image_media_id.safeParse(1.5).success, tool);
+  }
+  // The button styles the tools take are the vocabulary's, icon among them.
+  const styles = VOCABULARIES.header_button_style.values.map((v) => v.value);
+  assert.ok(styles.includes("icon"));
+  for (const tool of ["add_header_item", "update_header_item"]) {
+    const { button_style } = definitions.get(tool).inputSchema;
+    for (const value of styles) assert.ok(button_style.safeParse(value).success, `${tool} ${value}`);
+  }
+});
+
+test("add_header_item: the mega texts keep to the backend's lengths", () => {
+  const { description, highlight, cta_label } = definitions.get("add_header_item").inputSchema;
+  assert.ok(description.safeParse("x".repeat(500)).success);
+  assert.ok(!description.safeParse("x".repeat(501)).success);
+  assert.ok(highlight.safeParse("from $1,990").success);
+  assert.ok(!highlight.safeParse("x".repeat(101)).success);
+  assert.ok(!cta_label.safeParse("x".repeat(101)).success);
+});
+
+test("add_header_item_translation: POSTs the label, link and mega texts for one language", async () => {
+  const r = await call("add_header_item_translation", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    language_id: 45,
+    label: "Offer",
+    url: "offer",
+    description: "Everything included",
+    highlight: "from $1,990",
+    cta_label: "Book now",
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/headers/6/items/18/translations"));
+  assert.deepEqual(lastBody(), {
+    language_id: 45,
+    label: "Offer",
+    url: "offer",
+    description: "Everything included",
+    highlight: "from $1,990",
+    cta_label: "Book now",
+  });
+
+  await call("add_header_item_translation", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    language_id: 45,
+    label: "About",
+  });
+  assert.deepEqual(lastBody(), { language_id: 45, label: "About" });
+});
+
+test("update_header_item_translation: only what is given is sent; null or '' clears a mega text", async () => {
+  const r = await call("update_header_item_translation", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    language_id: 22,
+    highlight: "from $1,790",
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/headers/6/items/18/translations/22"));
+  assert.deepEqual(lastBody(), { highlight: "from $1,790" });
+
+  await call("update_header_item_translation", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    language_id: 22,
+    description: null,
+    cta_label: "",
+  });
+  assert.deepEqual(lastBody(), { description: null, cta_label: "" });
+
+  await call("update_header_item_translation", {
+    project: PROJECT,
+    header_id: 6,
+    item_id: 18,
+    language_id: 22,
+    label: "Prices",
+  });
+  assert.deepEqual(lastBody(), { label: "Prices" });
+
+  const schema = definitions.get("update_header_item_translation").inputSchema;
+  for (const key of ["description", "highlight", "cta_label"]) {
+    assert.ok(schema[key].safeParse(null).success, key);
+    assert.ok(schema[key].safeParse("").success, key);
+    assert.ok(schema[key].safeParse(undefined).success, key);
+  }
+  assert.ok(!schema.description.safeParse("x".repeat(501)).success);
+  assert.ok(!schema.label.safeParse(null).success);
+  assert.ok(!schema.label.safeParse("").success);
+});
+
+test("create_page / update_page: header_style takes exactly the vocabulary's designs, mega among them", async () => {
+  const values = VOCABULARIES.header_style.values.map((v) => v.value);
+  assert.deepEqual(values, ["classic", "transparent", "mega"]);
+  for (const tool of ["create_page", "update_page"]) {
+    const schema = definitions.get(tool).inputSchema.header_style;
+    for (const value of [...values, undefined]) {
+      assert.ok(schema.safeParse(value).success, `${tool} ${value}`);
+    }
+    assert.ok(!schema.safeParse("dark").success, tool);
+  }
+
+  const r = await call("update_page", { project: PROJECT, page_id: 5, header_style: "mega" });
+  assert.ok(!isError(r));
+  assert.ok(lastCall().url.endsWith("/admin/pages/5"));
+  assert.equal(lastBody().header_style, "mega");
+});
+
+test("get_page: shows a mega header_style as it is", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/pages/8": { status: "success", data: { id: 8, translations: [], header_style: "mega" } },
+  });
+  const out = JSON.parse((await call("get_page", { project: PROJECT, page_id: 8 })).content[0].text);
+  assert.equal(out.header_style, "mega");
+});
+
+test("get_component: a header's items come back with their mega fields", async () => {
+  const item = {
+    id: 18,
+    image_media_id: 52,
+    image_media: { id: 52, relative_path: "menu/dhi.webp", mime_type: "image/webp" },
+    image_media_url: "/media/menu/dhi.webp",
+    mega_display: "tile",
+    translations: [
+      {
+        language: { id: 22, code: "en" },
+        label: "DHI",
+        url: "dhi",
+        description: "From $1,990",
+        highlight: null,
+        cta_label: null,
+      },
+    ],
+    children: [],
+  };
+  globalThis.fetch = routedFetch({
+    "/admin/headers/6": { status: "success", data: { id: 6, items: [item] } },
+  });
+  const out = JSON.parse(
+    (await call("get_component", { project: PROJECT, component: "header", component_id: 6 })).content[0].text,
+  );
+  assert.deepEqual(out.data.items[0], item);
 });
 
 test("list_media: GET /admin/media with search params", async () => {
@@ -1238,4 +1473,87 @@ test("save_contact_form_options: posts one row per option and keeps code verbati
     "code must be sent unchanged — it is the value submitted with the lead",
   );
   assert.ok(bodies.every((b) => b.language_id === 45));
+});
+
+// --- header items: the mega texts ride along in the translation sweep ---------
+
+function headerFetch() {
+  return routedFetch({
+    "/admin/languages": EN_AR_LANGUAGES,
+    "/admin/headers/6": {
+      status: "success",
+      data: {
+        id: 6,
+        items: [
+          {
+            id: 18,
+            mega_display: "promo",
+            translations: [
+              {
+                language: { id: 22, code: "en" },
+                label: "Summer offer",
+                url: "offer",
+                description: "Flights and hotel included",
+                highlight: "from $1,990",
+                cta_label: null,
+              },
+            ],
+            children: [],
+          },
+        ],
+      },
+    },
+    "/admin/headers": { status: "success", data: { headers: [{ id: 6 }], total: 1 } },
+  });
+}
+
+test("translation_worklist: a header item hands over its mega texts to translate", async () => {
+  globalThis.fetch = headerFetch();
+  setSession(FOOTER_PROJECT, "test-token", 60, { id: 1, email: "t@t.com", full_name: "Test", role: "admin" });
+  const r = await call("translation_worklist", {
+    project: FOOTER_PROJECT,
+    target_language_code: "ar",
+    source_language_code: "en",
+    types: ["header_item"],
+    limit: 25,
+  });
+  assert.ok(!isError(r), r.content?.[0]?.text);
+  const out = JSON.parse(r.content[0].text);
+  assert.equal(out.items.length, 1);
+  assert.equal(out.items[0].parent_id, 6);
+  // An empty cta_label is not handed over; the url is handled, not translated.
+  assert.deepEqual(out.items[0].fields, {
+    label: "Summer offer",
+    description: "Flights and hotel included",
+    highlight: "from $1,990",
+  });
+});
+
+test("save_translations: a header item's mega texts are written with its label", async () => {
+  globalThis.fetch = headerFetch();
+  setSession(FOOTER_PROJECT, "test-token", 60, { id: 1, email: "t@t.com", full_name: "Test", role: "admin" });
+  const r = await call("save_translations", {
+    project: FOOTER_PROJECT,
+    language_code: "ar",
+    source_language_code: "en",
+    localize_urls: false,
+    items: [
+      {
+        type: "header_item",
+        id: 18,
+        parent_id: 6,
+        fields: { label: "عرض الصيف", description: "الطيران والفندق مشمولان", highlight: "من 1990$" },
+      },
+    ],
+  });
+  assert.ok(!isError(r), r.content?.[0]?.text);
+  const write = calls.find((c) => c.method === "POST");
+  assert.ok(write.url.endsWith("/admin/headers/6/items/18/translations"), write.url);
+  assert.deepEqual(JSON.parse(write.body), {
+    label: "عرض الصيف",
+    url: "offer",
+    description: "الطيران والفندق مشمولان",
+    highlight: "من 1990$",
+    language_id: 45,
+  });
 });

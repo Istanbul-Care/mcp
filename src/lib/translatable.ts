@@ -492,7 +492,14 @@ export const SURFACES: TranslatableSurface[] = [
       key: "language_id",
     },
     titleField: "label",
-    fields: [t("label"), bareUrl("url")],
+    // description / highlight / cta_label: the mega header design's texts.
+    fields: [
+      t("label"),
+      bareUrl("url"),
+      t("description", 500),
+      t("highlight", 100),
+      t("cta_label", 100),
+    ],
   },
   {
     type: "global_setting",

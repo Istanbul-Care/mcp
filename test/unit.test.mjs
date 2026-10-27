@@ -274,6 +274,36 @@ test("checkVocabulary: a menu item must be custom_button to keep its submenu", (
   assert.equal(checkVocabulary("header_item_type", "link").ok, false);
 });
 
+test("checkVocabulary: the header designs, button styles and mega menu displays", () => {
+  for (const style of ["classic", "transparent", "mega"]) {
+    assert.equal(checkVocabulary("header_style", style).ok, true, style);
+  }
+  assert.equal(checkVocabulary("header_style", "dark").ok, false);
+  for (const style of ["filled", "green", "outline", "icon"]) {
+    assert.equal(checkVocabulary("header_button_style", style).ok, true, style);
+  }
+  assert.equal(checkVocabulary("header_button_style", "primary").ok, false);
+  for (const display of ["column", "promo", "feature", "tile", "link"]) {
+    assert.equal(checkVocabulary("header_mega_display", display).ok, true, display);
+  }
+  assert.equal(checkVocabulary("header_mega_display", "grid").ok, false);
+  // Leaving it empty is the automatic display, not an error.
+  assert.equal(checkVocabulary("header_mega_display", null).ok, true);
+  // Each display says what it shows; the vocabulary says only the mega design reads it.
+  assert.ok(VOCABULARIES.header_mega_display.values.every((v) => v.note));
+  assert.match(VOCABULARIES.header_mega_display.note, /mega/);
+});
+
+test("registry: a header item's mega texts are translated, within the backend's lengths", () => {
+  const surface = getSurface("header_item");
+  const byName = Object.fromEntries(surface.fields.map((f) => [f.name, f]));
+  assert.deepEqual(Object.keys(byName), ["label", "url", "description", "highlight", "cta_label"]);
+  assert.equal(byName.description.kind, "text");
+  assert.equal(byName.description.maxLength, 500);
+  assert.equal(byName.highlight.maxLength, 100);
+  assert.equal(byName.cta_label.maxLength, 100);
+});
+
 test("checkVocabulary: an empty or unknown field never blocks a write", () => {
   assert.equal(checkVocabulary("card_type", "").ok, true);
   assert.equal(checkVocabulary("card_type", undefined).ok, true);

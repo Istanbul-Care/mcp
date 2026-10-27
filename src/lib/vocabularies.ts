@@ -172,6 +172,83 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
     on_unknown: "The dropdown reads the wrong collection and disappears entirely.",
   },
 
+  header_style: {
+    field: "header_style",
+    applies_to: "page",
+    values: [
+      { value: "classic", note: "The brand bar. Also the meaning of an empty value." },
+      {
+        value: "transparent",
+        note:
+          "No background over the page's opening picture (hero or breadcrumb banner image); the " +
+          "brand background comes in once the visitor scrolls.",
+      },
+      {
+        value: "mega",
+        note:
+          "The transparent bar with a mega menu: hovering a top-level item opens a floating card " +
+          "under the bar with its sub-items, each laid out by its mega_display (see " +
+          "header_mega_display). The only design that reads the items' image_media, mega_display, " +
+          "description, highlight and cta_label.",
+      },
+    ],
+    on_unknown: "Rejected by the API.",
+  },
+
+  header_button_style: {
+    field: "button_style",
+    applies_to: "header_item",
+    values: [
+      { value: "filled", note: "The brand colour." },
+      { value: "green" },
+      { value: "outline" },
+      {
+        value: "icon",
+        note:
+          "A round button showing only the item's icon (icon_media_id); the label is read out by " +
+          "screen readers only — e.g. a tel: link.",
+      },
+    ],
+    on_unknown: "Rejected by the API.",
+    note:
+      "Empty = a plain menu link. Only a top-level custom_button item with a URL shows as a button.",
+  },
+
+  header_mega_display: {
+    field: "mega_display",
+    applies_to: "header_item",
+    values: [
+      {
+        value: "column",
+        note: "Right under a top item: its label is a small uppercase heading, its own sub-items under it.",
+      },
+      {
+        value: "promo",
+        note:
+          "Right under a top item: the highlighted box at the right end — label = the small top " +
+          "line, highlight = the big words (e.g. 'from $1,990'), description = its text, cta_label = " +
+          "its button, to the item's URL.",
+      },
+      {
+        value: "feature",
+        note:
+          "Inside a column: a wide card over image_media — label, description, cta_label (e.g. " +
+          "'See prices →'); the whole card links.",
+      },
+      {
+        value: "tile",
+        note:
+          "Inside a column: a photo tile — image_media, icon, label, description (e.g. 'From " +
+          "$1,990'); tiles sit side by side.",
+      },
+      { value: "link", note: "Inside a column: the label with its description under it." },
+    ],
+    on_unknown: "Rejected by the API.",
+    note:
+      "Empty = automatic: a column if the item has sub-items, else a link. Only the mega header " +
+      "design (a page's header_style 'mega') reads it; classic and transparent ignore it.",
+  },
+
   footer_item_type: {
     field: "type",
     applies_to: "footer_section_item",

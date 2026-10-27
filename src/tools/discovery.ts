@@ -22,8 +22,9 @@ export function registerDiscoveryTools(server: McpServer): void {
     {
       title: "Values the site actually renders",
       description:
-        "Every field where only a listed value renders: card and hero styles, menu item " +
-        "types, link icons, media types, form field types. These are dropdowns in the admin " +
+        "Every field where only a listed value renders: card and hero styles, page header " +
+        "designs, menu item types, header button styles and mega menu displays, link icons, " +
+        "media types, form field types. These are dropdowns in the admin " +
         "panel but free strings in the database — nothing validates them, and an unknown " +
         "value does not error, it just renders the wrong thing or nothing. Check this before " +
         "setting any type, style, icon or field_type. Needs no authentication.",

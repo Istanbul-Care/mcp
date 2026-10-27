@@ -108,7 +108,7 @@ agent is doing the writing.
 | `list_seo_schemas` / `set_post_seo_schema` | ✓ | Structured data (JSON-LD) |
 | `read_public_page` | – | A published page by slug path, with its real body HTML and full section payloads |
 | `list_pages` / `get_page` | ✓ | Pages with translations / one page's structure and SEO fields |
-| `create_page` / `update_page` | ✓ | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body; both also switch the page's sticky WhatsApp button (`sticky_whatsapp`: on/off + a link per language); `update_page` sets the services section's `style` (1: tall cards with category tabs, 2: categories side by side) and `category_ids` (only those, in that order), and the blog listing's `style` (1: two-column cards, 2: editorial list, 3: magazine with load more, 4: small cards) |
+| `create_page` / `update_page` | ✓ | Create a page (optionally with its `content` HTML + `page_content` block in one call) / compose its body; both also set the page's header design (`header_style`: classic, transparent, or mega — the transparent bar whose top items open a photo mega menu) and switch the page's sticky WhatsApp button (`sticky_whatsapp`: on/off + a link per language); `update_page` sets the services section's `style` (1: tall cards with category tabs, 2: categories side by side) and `category_ids` (only those, in that order), and the blog listing's `style` (1: two-column cards, 2: editorial list, 3: magazine with load more, 4: small cards) |
 | `fold_page_cards` | ✓ | Move a page's prose cards into its `page_content` body, byte for byte (previews by default) |
 | `set_page_content` | ✓ | Write a page's body HTML for one language + enable/position the `page_content` block |
 | `get_card` / `get_page_cards` | ✓ | One card in full / a page's cards in render order, with their text and images |
@@ -118,6 +118,8 @@ agent is doing the writing.
 | `create_package_section` / `create_offer` | ✓ | Build a pricing table tier by tier (price and currency are per-language) |
 | `list_links` / `create_link` / `update_link` / `delete_link` | ✓ | The reusable CTA buttons other blocks point at |
 | `create_header` / `update_header` / `delete_header` | ✓ | The nav shell the menu items hang off |
+| `list_headers` / `add_header_item` / `update_header_item` / `delete_header_item` | ✓ | The menu: items, dropdown children, an icon (`icon_media_id`), a top-level link shown as a button (`button_style` filled / green / outline / icon — `icon` is a round button with only the icon, e.g. a `tel:` link; `button_show_on`); for the mega design (page `header_style` `mega`) a photo (`image_media_id`) and how the item shows in the open menu (`mega_display`: column / promo right under a top item, feature / tile / link inside a column) |
+| `add_header_item_translation` / `update_header_item_translation` | ✓ | A menu item's label and link in one language, plus the mega menu texts (`description`, `highlight`, `cta_label`); on update what you leave out is kept, null or `""` clears a mega text |
 | `list_footers` / `create_footer` / `create_footer_translation` / `create_footer_section` / `create_footer_item` | ✓ | A footer, then its columns **per language** |
 | `update_multi_page_form` / `create_form_page` / `create_form_field` / `create_form_option` | ✓ | The consultation wizard's steps, inputs and choices (steps are per-language) |
 | `list_form_submissions` | ✓ | The leads a form has collected |
@@ -265,7 +267,8 @@ anywhere. Two tools carry the rules:
   menu item with `button_style`) is the exception: it opens `consultation` and
   `modal-dialog-…` forms.
 - `get_vocabularies` — every field where only a listed value renders: card and
-  hero styles, menu item types, link icons, media types, form field types. The
+  hero styles, page header designs, menu item types, header button styles and
+  mega menu displays, link icons, media types, form field types. The
   write tools reject a value the site cannot use, such as a style the admin
   panel once offered but the site never rendered (`coverflow`).
 
