@@ -368,6 +368,37 @@ const reviewsFlagParam = featureFlagParam
       "is cleared and the style falls back to 1.",
   );
 
+/**
+ * The social media block shows the brand's embeds (global settings
+ * embed_media). Like reviews, the backend stores exactly the object it is sent,
+ * so every field is in the schema and see_all_url takes the null get_page shows.
+ */
+const socialMediaFlagParam = featureFlagParam
+  .extend({
+    style: z
+      .union([z.literal(1), z.literal(2)])
+      .optional()
+      .describe(
+        "1 (default): the brand's Instagram / TikTok / YouTube embeds as they are. 2: the v8 " +
+          "video cards — the brand's YouTube embeds as cover cards with the person, their flag " +
+          "and the length (each embed's person_name, country_code, duration_seconds in " +
+          "update_global_setting), a filter of the countries present, the video playing in " +
+          "place on a click, and 'See all videos' to see_all_url.",
+      ),
+    see_all_url: z
+      .string()
+      .max(500)
+      .nullable()
+      .optional()
+      .describe("Style 2: where 'See all videos' goes, e.g. the brand's YouTube channel."),
+  })
+  .describe(
+    "The social media block (the brand's embeds from global settings). The object you pass " +
+      "REPLACES the stored one, so send style and see_all_url each time — read get_page " +
+      "(feature_blocks.social_media) first, or what you leave out is cleared and the style " +
+      "falls back to 1.",
+  );
+
 const stickyFormFlagParam = featureFlagParam
   .extend({
     form_code: z
@@ -922,7 +953,7 @@ export function registerPageTools(server: McpServer): void {
         // Built-in blocks, switched on rather than attached by id.
         blogs: blogsFlagParam.optional(),
         services: servicesFlagParam.optional(),
-        social_media: featureFlagParam.optional(),
+        social_media: socialMediaFlagParam.optional(),
         reviews: reviewsFlagParam.optional(),
         page_faq: pageFaqFlagParam.optional(),
         sticky_multi_form: stickyFormFlagParam.optional(),

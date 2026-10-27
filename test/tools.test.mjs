@@ -1758,3 +1758,140 @@ test("get_component / list_processes: a process shows its style, eyebrow and ste
   const list = JSON.parse((await call("list_processes", { project: PROJECT, limit: 50 })).content[0].text);
   assert.equal(list.data.processes[0].style, 2);
 });
+
+// --- the v8 video cards: embed media's own fields and the social block's style -
+
+const EMBED_VIDEO = {
+  media_type: "youtube",
+  media_url: "https://www.youtube.com/watch?v=abc123XYZ00",
+  media_id: "abc123XYZ00",
+  poster_id: 71,
+  title: "My DHI journey",
+  person_name: "James, 41",
+  country_code: "gb",
+  duration_seconds: 184,
+};
+const EMBED_INSTAGRAM = {
+  media_type: "instagram",
+  media_url: "-",
+  media_id: "elfsight-app-1",
+  poster_id: null,
+  title: null,
+  person_name: null,
+  country_code: null,
+  duration_seconds: null,
+};
+
+test("update_global_setting: the embed list goes as given, every item with all its fields", async () => {
+  const r = await call("update_global_setting", {
+    project: PROJECT,
+    setting_id: 1,
+    embed_media: [EMBED_VIDEO, EMBED_INSTAGRAM],
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/global-settings/1"));
+  assert.deepEqual(lastBody(), { embed_media: [EMBED_VIDEO, EMBED_INSTAGRAM] });
+
+  // Left out: the list stays as it is.
+  await call("update_global_setting", { project: PROJECT, setting_id: 1, popup_enabled: true });
+  assert.deepEqual(lastBody(), { popup_enabled: true });
+  // An empty list removes them all.
+  await call("update_global_setting", { project: PROJECT, setting_id: 1, embed_media: [] });
+  assert.deepEqual(lastBody(), { embed_media: [] });
+});
+
+test("update_global_setting: an embed type the site has no branch for is refused before the request", async () => {
+  const r = await call("update_global_setting", {
+    project: PROJECT,
+    setting_id: 1,
+    embed_media: [EMBED_VIDEO, { media_type: "vimeo", media_url: "https://vimeo.com/1" }],
+  });
+  assert.ok(isError(r));
+  assert.match(r.content[0].text, /vimeo/);
+  assert.equal(calls.length, 0);
+});
+
+test("create_global_setting / update_global_setting: the embed schema keeps every field and checks them", () => {
+  for (const tool of ["create_global_setting", "update_global_setting"]) {
+    const schema = definitions.get(tool).inputSchema.embed_media;
+    // A save replaces the whole list, so nothing read back may be dropped on the way out.
+    const parsed = schema.safeParse([EMBED_VIDEO, EMBED_INSTAGRAM]);
+    assert.ok(parsed.success, tool);
+    assert.deepEqual(parsed.data, [EMBED_VIDEO, EMBED_INSTAGRAM], tool);
+    assert.match(schema.description, /REPLACES the whole list/, tool);
+
+    const item = (patch) => [{ ...EMBED_VIDEO, ...patch }];
+    assert.ok(schema.safeParse(item({ country_code: "DE" })).success, tool);
+    assert.ok(!schema.safeParse(item({ country_code: "GBR" })).success, tool);
+    assert.ok(!schema.safeParse(item({ country_code: "G1" })).success, tool);
+    assert.ok(!schema.safeParse(item({ duration_seconds: 86401 })).success, tool);
+    assert.ok(!schema.safeParse(item({ duration_seconds: -1 })).success, tool);
+    assert.ok(!schema.safeParse(item({ duration_seconds: 1.5 })).success, tool);
+    assert.ok(!schema.safeParse(item({ person_name: "x".repeat(121) })).success, tool);
+    assert.ok(!schema.safeParse(item({ title: "x".repeat(256) })).success, tool);
+    assert.ok(!schema.safeParse([{ media_type: "youtube" }]).success, tool);
+  }
+});
+
+test("create_global_setting: carries the embed list beside the settings", async () => {
+  const r = await call("create_global_setting", {
+    project: PROJECT,
+    robots_txt_content: "User-agent: *",
+    llms_txt_content: "# Brand",
+    site_url: "https://example.com",
+    language_id: 22,
+    address: "Istanbul",
+    phone_number: "+90",
+    cta_text: "Free consultation",
+    cta_url: "consultation",
+    embed_media: [EMBED_VIDEO],
+  });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().embed_media, [EMBED_VIDEO]);
+});
+
+test("get_component: global settings show each embed's video card fields", async () => {
+  const setting = { id: 1, embed_media: [{ id: 5, ...EMBED_VIDEO, country_code: "GB", poster: { id: 71 } }] };
+  globalThis.fetch = routedFetch({ "/admin/global-settings/1": { status: "success", data: setting } });
+  const out = JSON.parse(
+    (await call("get_component", { project: PROJECT, component: "global_setting", component_id: 1 })).content[0].text,
+  );
+  assert.deepEqual(out.data, setting);
+});
+
+const SOCIAL_V8 = {
+  enabled: true,
+  order: 7,
+  grid_columns: 12,
+  style: 2,
+  see_all_url: "https://www.youtube.com/@brand/videos",
+};
+
+test("update_page: the social media block takes style 2 and see_all_url, sent as given", async () => {
+  const r = await call("update_page", { project: PROJECT, page_id: 5, social_media: SOCIAL_V8 });
+  assert.ok(!isError(r));
+  assert.ok(lastCall().url.endsWith("/admin/pages/5"));
+  assert.deepEqual(lastBody().social_media, SOCIAL_V8);
+  assert.deepEqual(JSON.parse(r.content[0].text).changed, ["social_media"]);
+});
+
+test("update_page: the social media schema keeps every field, so a re-sent block is not reset", () => {
+  const schema = definitions.get("update_page").inputSchema.social_media;
+  const parsed = schema.safeParse(SOCIAL_V8);
+  assert.ok(parsed.success);
+  assert.deepEqual(parsed.data, SOCIAL_V8);
+  assert.ok(schema.safeParse({ enabled: true, style: 1, see_all_url: null }).success);
+  assert.ok(schema.safeParse({ enabled: false }).success);
+  assert.ok(!schema.safeParse({ enabled: true, style: 3 }).success);
+  assert.ok(!schema.safeParse({ enabled: true, see_all_url: "x".repeat(501) }).success);
+  assert.match(schema.description, /REPLACES/);
+});
+
+test("get_page: shows the social media block as stored, style and see_all_url included", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/pages/8": { status: "success", data: { id: 8, translations: [], social_media: SOCIAL_V8 } },
+  });
+  const out = JSON.parse((await call("get_page", { project: PROJECT, page_id: 8 })).content[0].text);
+  assert.deepEqual(out.feature_blocks.social_media, SOCIAL_V8);
+});

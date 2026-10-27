@@ -586,6 +586,70 @@ export function registerComponentTools(server: McpServer): void {
     label: "global settings",
   });
 
+  /**
+   * The brand's embeds (a page's social_media block shows them). A save
+   * replaces the whole list — the backend deletes every item and recreates
+   * what it is sent — so every field is in this schema (zod strips a key it
+   * does not know, and the item would come back without it), and the optional
+   * ones take null because the read shows an unset field as null.
+   */
+  const embedMediaItem = z.object({
+    media_type: z
+      .string()
+      .min(1)
+      .max(50)
+      .describe("instagram | tiktok | youtube — see get_vocabularies (social_embed_type)."),
+    media_url: z
+      .string()
+      .min(1)
+      .max(500)
+      .describe("The post's address (required; the site plays media_id)."),
+    media_id: z
+      .string()
+      .max(255)
+      .nullable()
+      .optional()
+      .describe("youtube / tiktok: the bare video id; instagram: the Elfsight app id."),
+    poster_id: z.number().int().nullable().optional().describe("A cover image (a media id)."),
+    title: z
+      .string()
+      .max(255)
+      .nullable()
+      .optional()
+      .describe("Video cards: the video's own name."),
+    person_name: z
+      .string()
+      .max(120)
+      .nullable()
+      .optional()
+      .describe("Video cards: who speaks in it (the patient or doctor)."),
+    country_code: z
+      .string()
+      .regex(/^[A-Za-z]{2}$/, "two letters, ISO 3166 alpha-2")
+      .nullable()
+      .optional()
+      .describe(
+        "Video cards: their country, ISO 3166 alpha-2 (GB, DE…) — the flag and the country " +
+          "filter. Stored upper-case.",
+      ),
+    duration_seconds: z
+      .number()
+      .int()
+      .min(0)
+      .max(86400)
+      .nullable()
+      .optional()
+      .describe("Video cards: its length in seconds."),
+  });
+  const EMBED_MEDIA_TEXT =
+    "The brand's Instagram / TikTok / YouTube embeds, which a page's social_media block shows " +
+    "(style 2, the video cards, shows the youtube ones with their title, person, flag and " +
+    "length). A save REPLACES the whole list — every item is deleted and recreated from what " +
+    "you send — so send every item with all its fields: read get_component (component " +
+    "global_setting) first and send each item back with its changes (poster_id, not poster).";
+  const embedVocabulary = (items: Array<{ media_type: string }> | undefined) =>
+    (items ?? []).map((item): [string, unknown] => ["social_embed_type", item.media_type]);
+
   server.registerTool(
     "create_global_setting",
     {
@@ -619,15 +683,21 @@ export function registerComponentTools(server: McpServer): void {
         phone_number: z.string(),
         cta_text: z.string(),
         cta_url: z.string(),
+        embed_media: z.array(embedMediaItem).optional().describe(EMBED_MEDIA_TEXT),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
     async ({ project, language_id, address, phone_number, cta_text, cta_url, ...rest }) =>
       guard(() =>
-        createEntity(project, "/admin/global-settings", {
-          ...rest,
-          translation: { language_id, address, phone_number, cta_text, cta_url },
-        }),
+        createEntity(
+          project,
+          "/admin/global-settings",
+          {
+            ...rest,
+            translation: { language_id, address, phone_number, cta_text, cta_url },
+          },
+          embedVocabulary(rest.embed_media),
+        ),
       ),
   );
 
@@ -636,9 +706,10 @@ export function registerComponentTools(server: McpServer): void {
     {
       title: "Update the brand's global settings",
       description:
-        "Edits the site-wide settings (robots/llms.txt, site URL, scripts, favicon, flags). Pass " +
-        "only what changes; the contact/social text is per-language — use the translate tools. " +
-        "Requires login.",
+        "Edits the site-wide settings (robots/llms.txt, site URL, scripts, favicon, flags, the " +
+        "brand's embeds). Pass only what changes; the contact/social text is per-language — use " +
+        "the translate tools. embed_media is the exception to 'only what changes': it replaces " +
+        "the whole list. Requires login.",
       inputSchema: {
         project: projectParam,
         setting_id: z.number().int(),
@@ -659,11 +730,17 @@ export function registerComponentTools(server: McpServer): void {
             "the popup's button link if it has one (a WhatsApp link opens straight away, no second form), " +
             "else a thank-you and the popup closes. Leave the button link empty for a form-only popup."),
         is_active: z.boolean().optional(),
+        embed_media: z
+          .array(embedMediaItem)
+          .optional()
+          .describe(`${EMBED_MEDIA_TEXT} Leave it out to keep the list as it is; [] removes them all.`),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
     async ({ project, setting_id, ...body }) =>
       guard(async () => {
+        const badValue = ensureVocabulary(embedVocabulary(body.embed_media));
+        if (badValue) return fail(badValue);
         await put(project, `/admin/global-settings/${setting_id}`, body);
         return ok({ project, setting_id, updated: true });
       }),
