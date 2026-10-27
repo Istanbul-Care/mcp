@@ -157,6 +157,7 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
     values: [
       { value: "default_faq", label: "Searchable FAQ with CTA" },
       { value: "word_style_faq", label: "Word-style FAQ", note: "The site also accepts the misspelling 'world_style_faq'." },
+      { value: "whatsapp_box_faq", label: "One list + WhatsApp box (v8)", note: "On the brand's navy: every question once, no categories or search, the first answer open and one open at a time, then a green WhatsApp box (\"Still have a question? Ask a doctor on WhatsApp · Chat now\") going through the lead form to the brand's WhatsApp." },
     ],
     on_unknown: "Falls back to the searchable FAQ.",
   },

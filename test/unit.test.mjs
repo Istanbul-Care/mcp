@@ -420,3 +420,7 @@ test("pruned: an explicit null still goes through", () => {
   // Clearing a field is a real intent, and distinct from omitting it.
   assert.deepEqual(pruned({ logo_id: null }), { logo_id: null });
 });
+
+test("vocabulary: the FAQ's v8 style is a real style", () => {
+  assert.equal(checkVocabulary("faq_style", "whatsapp_box_faq").ok, true);
+});
