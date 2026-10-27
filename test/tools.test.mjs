@@ -206,6 +206,61 @@ test("update_page: the blog listing takes a style 1 to 4", async () => {
   assert.ok(!schema.safeParse({ enabled: true, style: 5 }).success);
 });
 
+const REVIEWS_V8 = {
+  enabled: true,
+  order: 6,
+  grid_columns: 12,
+  style: 2,
+  average_rating: 4.7,
+  total_reviews_text: "1,179",
+  years_experience_text: null,
+  since_year: 2012,
+  countries_text: "30+",
+  follow_up_text: "12 mo",
+  read_all_url: "https://g.page/r/example/review",
+};
+
+test("update_page: the reviews block takes style 2 and its figures, all sent as given", async () => {
+  const r = await call("update_page", { project: PROJECT, page_id: 5, reviews: REVIEWS_V8 });
+  assert.ok(!isError(r));
+  assert.ok(lastCall().url.endsWith("/admin/pages/5"));
+  assert.deepEqual(lastBody().reviews, REVIEWS_V8);
+  assert.deepEqual(JSON.parse(r.content[0].text).changed, ["reviews"]);
+});
+
+test("update_page: the reviews schema keeps every field, so a re-sent block is not reset", () => {
+  const schema = definitions.get("update_page").inputSchema.reviews;
+  // zod strips keys it does not know; the stored object is replaced by what is
+  // sent, so a dropped style or figure would silently go back to its default.
+  const parsed = schema.safeParse(REVIEWS_V8);
+  assert.ok(parsed.success);
+  assert.deepEqual(parsed.data, REVIEWS_V8);
+  // get_page shows unset fields as null; sending them back must be accepted.
+  const unset = { enabled: true, style: 1, since_year: null, countries_text: null, follow_up_text: null, read_all_url: null, average_rating: null, total_reviews_text: null };
+  assert.ok(schema.safeParse(unset).success);
+  assert.ok(schema.safeParse({ enabled: true }).success);
+
+  assert.ok(!schema.safeParse({ enabled: true, style: 3 }).success);
+  assert.ok(!schema.safeParse({ enabled: true, style: null }).success);
+  assert.ok(!schema.safeParse({ enabled: true, since_year: 1899 }).success);
+  assert.ok(!schema.safeParse({ enabled: true, since_year: 2101 }).success);
+  assert.ok(!schema.safeParse({ enabled: true, since_year: 2012.5 }).success);
+  assert.ok(!schema.safeParse({ enabled: true, countries_text: "x".repeat(17) }).success);
+  assert.ok(!schema.safeParse({ enabled: true, follow_up_text: "x".repeat(17) }).success);
+  assert.ok(!schema.safeParse({ enabled: true, read_all_url: "x".repeat(501) }).success);
+  assert.ok(!schema.safeParse({ enabled: true, average_rating: 5.1 }).success);
+  // The block's own text says a partial object replaces the stored one.
+  assert.match(schema.description, /REPLACES/);
+});
+
+test("get_page: shows the reviews block as stored, style and figures included", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/pages/8": { status: "success", data: { id: 8, translations: [], reviews: REVIEWS_V8 } },
+  });
+  const out = JSON.parse((await call("get_page", { project: PROJECT, page_id: 8 })).content[0].text);
+  assert.deepEqual(out.feature_blocks.reviews, REVIEWS_V8);
+});
+
 test("update_page: the services section accepts only style 1 or 2 and category ids", () => {
   const services = definitions.get("update_page").inputSchema.services;
   assert.ok(services.safeParse({ enabled: true, style: 2, category_ids: [4] }).success);

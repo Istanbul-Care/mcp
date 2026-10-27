@@ -301,13 +301,72 @@ const blogsFlagParam = featureFlagParam
       "time — read get_page (feature_blocks.blogs) first, or it falls back to style 1.",
   );
 
+/**
+ * The reviews block. Like blogs and services, the backend stores exactly the
+ * object it is sent, so every field has to be in this schema: zod strips a key
+ * it does not know, and a style or figure read back from get_page would be
+ * dropped on the way out and reset. The optional fields take null because
+ * get_page shows an unset one as null and the caller re-sends what it read.
+ */
 const reviewsFlagParam = featureFlagParam
   .extend({
-    average_rating: z.number().min(0).max(5).optional(),
-    total_reviews_text: z.string().max(128).optional(),
-    years_experience_text: z.string().max(128).optional(),
+    style: z
+      .union([z.literal(1), z.literal(2)])
+      .optional()
+      .describe(
+        "1 (default): the turning deck with platform tabs. 2: the v8 design on the brand's " +
+          "navy — a small heading and title, a 'Google 4.7 ★ · 1,179 Google reviews · Read all' " +
+          "line, white review cards sliding side by side (the middle one large), and a row of " +
+          "up to four figures, each shown only when set.",
+      ),
+    average_rating: z
+      .number()
+      .min(0)
+      .max(5)
+      .nullable()
+      .optional()
+      .describe("The Google rating, e.g. 4.7. Style 2: the rating line and the first figure."),
+    total_reviews_text: z
+      .string()
+      .max(128)
+      .nullable()
+      .optional()
+      .describe("How many reviews, e.g. '1,179'. Style 2: the rating line and the first figure."),
+    years_experience_text: z.string().max(128).nullable().optional(),
+    since_year: z
+      .number()
+      .int()
+      .min(1900)
+      .max(2100)
+      .nullable()
+      .optional()
+      .describe("Style 2 figure 'Serving patients since', e.g. 2012."),
+    countries_text: z
+      .string()
+      .max(16)
+      .nullable()
+      .optional()
+      .describe("Style 2 figure 'Countries our patients come from', e.g. '30+'."),
+    follow_up_text: z
+      .string()
+      .max(16)
+      .nullable()
+      .optional()
+      .describe("Style 2 figure 'Follow-up after the procedure', e.g. '12 mo'."),
+    read_all_url: z
+      .string()
+      .max(500)
+      .nullable()
+      .optional()
+      .describe(
+        "Style 2: where 'Read all' goes — the brand's Google reviews; it opens in a new tab.",
+      ),
   })
-  .describe("The reviews block.");
+  .describe(
+    "The reviews block. The object you pass REPLACES the stored one, so send style and every " +
+      "figure each time — read get_page (feature_blocks.reviews) first, or what you leave out " +
+      "is cleared and the style falls back to 1.",
+  );
 
 const stickyFormFlagParam = featureFlagParam
   .extend({
