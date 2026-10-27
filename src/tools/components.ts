@@ -610,27 +610,38 @@ export function registerComponentTools(server: McpServer): void {
       .nullable()
       .optional()
       .describe("youtube / tiktok: the bare video id; instagram: the Elfsight app id."),
-    poster_id: z.number().int().nullable().optional().describe("A cover image (a media id)."),
-    title: z
-      .string()
-      .max(255)
+    poster_id: z
+      .number()
+      .int()
       .nullable()
       .optional()
-      .describe("Video cards: the video's own name."),
+      .describe("A cover image (a media id). Patient stories: the face and the phone's cover — portrait works best."),
     person_name: z
       .string()
       .max(120)
       .nullable()
       .optional()
-      .describe("Video cards: who speaks in it (the patient or doctor)."),
+      .describe("Patient stories: the person's full name; the first word shows under their face."),
+    title: z
+      .string()
+      .max(255)
+      .nullable()
+      .optional()
+      .describe("Patient stories: the line under the name in the phone."),
+    tag: z
+      .string()
+      .max(60)
+      .nullable()
+      .optional()
+      .describe("Patient stories: a short tag chip, e.g. the technique ('Long FUE')."),
     country_code: z
       .string()
       .regex(/^[A-Za-z]{2}$/, "two letters, ISO 3166 alpha-2")
       .nullable()
       .optional()
       .describe(
-        "Video cards: their country, ISO 3166 alpha-2 (GB, DE…) — the flag and the country " +
-          "filter. Stored upper-case.",
+        "Patient stories: their country, ISO 3166 alpha-2 (GB, DE…) — the country chip and " +
+          "'Name · Country' in the phone's top bar. Stored upper-case.",
       ),
     duration_seconds: z
       .number()
@@ -639,12 +650,12 @@ export function registerComponentTools(server: McpServer): void {
       .max(86400)
       .nullable()
       .optional()
-      .describe("Video cards: its length in seconds."),
+      .describe("Its length in seconds (not shown by the patient stories)."),
   });
   const EMBED_MEDIA_TEXT =
     "The brand's Instagram / TikTok / YouTube embeds, which a page's social_media block shows " +
-    "(style 2, the video cards, shows the youtube ones with their title, person, flag and " +
-    "length). A save REPLACES the whole list — every item is deleted and recreated from what " +
+    "(style 2, the patient stories, shows the youtube ones: faces beside a phone that plays " +
+    "the one picked, with its person, title, tag and country). A save REPLACES the whole list — every item is deleted and recreated from what " +
     "you send — so send every item with all its fields: read get_component (component " +
     "global_setting) first and send each item back with its changes (poster_id, not poster).";
   const embedVocabulary = (items: Array<{ media_type: string }> | undefined) =>

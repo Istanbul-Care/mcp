@@ -379,18 +379,19 @@ const socialMediaFlagParam = featureFlagParam
       .union([z.literal(1), z.literal(2)])
       .optional()
       .describe(
-        "1 (default): the brand's Instagram / TikTok / YouTube embeds as they are. 2: the v8 " +
-          "video cards — the brand's YouTube embeds as cover cards with the person, their flag " +
-          "and the length (each embed's person_name, country_code, duration_seconds in " +
-          "update_global_setting), a filter of the countries present, the video playing in " +
-          "place on a click, and 'See all videos' to see_all_url.",
+        "1 (default): the brand's Instagram / TikTok / YouTube embeds as they are. 2: the " +
+          "patient stories — a row of round faces (the brand's YouTube embeds) beside a phone " +
+          "that plays the one picked inside it, showing the person's full name, the video's " +
+          "title as its line, a tag chip and a country chip (each embed's person_name, title, " +
+          "tag, country_code and poster in update_global_setting); buttons 'Chat on WhatsApp' " +
+          "and 'See all reviews' (to see_all_url).",
       ),
     see_all_url: z
       .string()
       .max(500)
       .nullable()
       .optional()
-      .describe("Style 2: where 'See all videos' goes, e.g. the brand's YouTube channel."),
+      .describe("Style 2: where 'See all reviews' goes, e.g. the brand's YouTube channel or Google reviews."),
   })
   .describe(
     "The social media block (the brand's embeds from global settings). The object you pass " +

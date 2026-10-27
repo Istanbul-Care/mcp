@@ -320,8 +320,8 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
     on_unknown: "The item is silently dropped from the section.",
     note:
       "The brand's embeds: global settings embed_media (create_global_setting / " +
-      "update_global_setting), shown by a page's social_media block. Its style 2 (the video " +
-      "cards) shows only the youtube ones.",
+      "update_global_setting), shown by a page's social_media block. Its style 2 (the patient " +
+      "stories) shows only the youtube ones.",
   },
 
   form_field_type: {

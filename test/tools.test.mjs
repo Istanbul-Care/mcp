@@ -1759,7 +1759,7 @@ test("get_component / list_processes: a process shows its style, eyebrow and ste
   assert.equal(list.data.processes[0].style, 2);
 });
 
-// --- the v8 video cards: embed media's own fields and the social block's style -
+// --- the patient stories: embed media's own fields and the social block's style -
 
 const EMBED_VIDEO = {
   media_type: "youtube",
@@ -1767,7 +1767,8 @@ const EMBED_VIDEO = {
   media_id: "abc123XYZ00",
   poster_id: 71,
   title: "My DHI journey",
-  person_name: "James, 41",
+  person_name: "James Walker",
+  tag: "Long FUE",
   country_code: "gb",
   duration_seconds: 184,
 };
@@ -1778,6 +1779,7 @@ const EMBED_INSTAGRAM = {
   poster_id: null,
   title: null,
   person_name: null,
+  tag: null,
   country_code: null,
   duration_seconds: null,
 };
@@ -1830,6 +1832,8 @@ test("create_global_setting / update_global_setting: the embed schema keeps ever
     assert.ok(!schema.safeParse(item({ duration_seconds: 1.5 })).success, tool);
     assert.ok(!schema.safeParse(item({ person_name: "x".repeat(121) })).success, tool);
     assert.ok(!schema.safeParse(item({ title: "x".repeat(256) })).success, tool);
+    assert.ok(schema.safeParse(item({ tag: "x".repeat(60) })).success, tool);
+    assert.ok(!schema.safeParse(item({ tag: "x".repeat(61) })).success, tool);
     assert.ok(!schema.safeParse([{ media_type: "youtube" }]).success, tool);
   }
 });
@@ -1851,7 +1855,7 @@ test("create_global_setting: carries the embed list beside the settings", async 
   assert.deepEqual(lastBody().embed_media, [EMBED_VIDEO]);
 });
 
-test("get_component: global settings show each embed's video card fields", async () => {
+test("get_component: global settings show each embed's patient story fields", async () => {
   const setting = { id: 1, embed_media: [{ id: 5, ...EMBED_VIDEO, country_code: "GB", poster: { id: 71 } }] };
   globalThis.fetch = routedFetch({ "/admin/global-settings/1": { status: "success", data: setting } });
   const out = JSON.parse(
@@ -1886,6 +1890,23 @@ test("update_page: the social media schema keeps every field, so a re-sent block
   assert.ok(!schema.safeParse({ enabled: true, style: 3 }).success);
   assert.ok(!schema.safeParse({ enabled: true, see_all_url: "x".repeat(501) }).success);
   assert.match(schema.description, /REPLACES/);
+  // Style 2 is the patient stories now; the video cards (and their country filter) are gone.
+  const style = schema.unwrap().shape.style.description;
+  assert.match(style, /patient stories/);
+  assert.match(style, /See all reviews/);
+  assert.doesNotMatch(style, /filter|video cards/);
+});
+
+test("embed media: the texts describe the patient stories, not the video cards", () => {
+  const item = definitions.get("update_global_setting").inputSchema.embed_media.unwrap().element.shape;
+  assert.match(item.person_name.description, /full name/);
+  assert.match(item.tag.description, /Long FUE/);
+  assert.match(item.country_code.description, /chip/);
+  assert.match(item.duration_seconds.description, /not shown/);
+  assert.match(item.poster_id.description, /portrait/);
+  for (const field of Object.values(item)) {
+    assert.doesNotMatch(field.description ?? "", /video cards|filter/);
+  }
 });
 
 test("get_page: shows the social media block as stored, style and see_all_url included", async () => {
