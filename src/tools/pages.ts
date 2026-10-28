@@ -140,9 +140,29 @@ const headerStyleParam = z
       "image_media_id and mega texts (see add_header_item / update_header_item).",
   );
 
+const bannerStyleParam = z
+  .union([z.literal(1), z.literal(2)])
+  .describe(
+    "The banner at the top of the page (breadcrumb_enabled): 1 (default) the featured image " +
+      "under a dark veil with the title and breadcrumb; 2 the brand's navy, no picture — the " +
+      "breadcrumb, the title and the page's excerpt on the left and banner_video_id on the right " +
+      "(under them on phones). Without a video the text fills the banner.",
+  );
+const bannerVideoParam = z
+  .number()
+  .int()
+  .positive()
+  .nullable()
+  .describe(
+    "Banner style 2: a VIDEO of the media library (uploaded, youtube.video, youtube.short or " +
+      "tiktok — see list_media / add_external_media); images are refused. null to clear.",
+  );
+
 interface PageDetail extends PageListItem, PageSections {
   header_id?: number | null;
   header_style?: (typeof HEADER_STYLES)[number] | null;
+  banner_style?: number | null;
+  banner_video_id?: number | null;
   footer_id?: number | null;
   featured_image_id?: number | null;
   page_content?: PageContentBlock | null;
@@ -537,6 +557,8 @@ export function registerPageTools(server: McpServer): void {
           parent_id: pageDetail.parent_id,
           header_id: pageDetail.header_id,
           header_style: pageDetail.header_style ?? "classic",
+          banner_style: pageDetail.banner_style ?? 1,
+          banner_video_id: pageDetail.banner_video_id ?? null,
           footer_id: pageDetail.footer_id,
           featured_image_id: pageDetail.featured_image_id,
           page_content: pageDetail.page_content ?? null,
@@ -634,6 +656,8 @@ export function registerPageTools(server: McpServer): void {
         footer_id: z.number().int().optional(),
         featured_image_id: z.number().int().optional(),
         breadcrumb_enabled: z.boolean().default(true),
+        banner_style: bannerStyleParam.optional(),
+        banner_video_id: bannerVideoParam.optional(),
         sticky_whatsapp: stickyWhatsAppParam.optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -945,6 +969,8 @@ export function registerPageTools(server: McpServer): void {
         project: projectParam,
         page_id: z.number().int(),
         featured_image_id: z.number().int().nullable().optional().describe("Cover image; null to clear."),
+        banner_style: bannerStyleParam.optional(),
+        banner_video_id: bannerVideoParam.optional(),
         header_id: z.number().int().optional(),
         header_style: headerStyleParam.optional(),
         footer_id: z.number().int().optional(),
