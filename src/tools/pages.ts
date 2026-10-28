@@ -178,6 +178,15 @@ const authorBoxParam = z
       "'Reviewed by <reviewer>, …' with their pictures and profile links. Placed by `order` among " +
       "the page's sections like the other blocks; it shows nothing while the page has no author.",
   );
+const layoutStyleParam = z
+  .union([z.literal(1), z.literal(2)])
+  .describe(
+    "How the page lays out its blocks: 1 (default) one after another across the page; 2 the " +
+      "article view — each block in a white box, one under the other, with the page's first " +
+      "contact form (else the brand's) in a sidebar beside them on wide screens. A hero keeps the " +
+      "full width above; three titled blocks or more open with a contents list. Ignored on a page " +
+      "that carries a post or a service.",
+  );
 const bannerVideoParam = z
   .number()
   .int()
@@ -195,6 +204,7 @@ interface PageDetail extends PageListItem, PageSections {
   banner_video_id?: number | null;
   author_id?: number | null;
   reviewer_id?: number | null;
+  layout_style?: number | null;
   footer_id?: number | null;
   featured_image_id?: number | null;
   page_content?: PageContentBlock | null;
@@ -593,6 +603,7 @@ export function registerPageTools(server: McpServer): void {
           banner_video_id: pageDetail.banner_video_id ?? null,
           author_id: pageDetail.author_id ?? null,
           reviewer_id: pageDetail.reviewer_id ?? null,
+          layout_style: pageDetail.layout_style ?? 1,
           footer_id: pageDetail.footer_id,
           featured_image_id: pageDetail.featured_image_id,
           page_content: pageDetail.page_content ?? null,
@@ -695,6 +706,7 @@ export function registerPageTools(server: McpServer): void {
         author_id: pageAuthorParam.optional(),
         reviewer_id: pageReviewerParam.optional(),
         author_box: authorBoxParam.optional(),
+        layout_style: layoutStyleParam.optional(),
         sticky_whatsapp: stickyWhatsAppParam.optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -1011,6 +1023,7 @@ export function registerPageTools(server: McpServer): void {
         author_id: pageAuthorParam.optional(),
         reviewer_id: pageReviewerParam.optional(),
         author_box: authorBoxParam.optional(),
+        layout_style: layoutStyleParam.optional(),
         header_id: z.number().int().optional(),
         header_style: headerStyleParam.optional(),
         footer_id: z.number().int().optional(),
