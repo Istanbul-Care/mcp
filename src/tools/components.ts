@@ -826,6 +826,23 @@ export function registerComponentTools(server: McpServer): void {
         footer_scripts: z.string().optional(),
         favicon_media_id: z.number().int().optional(),
         chat_bot_enabled: z.boolean().optional(),
+        chat_bot_name: z
+          .string()
+          .max(60)
+          .optional()
+          .describe("The chat assistant's name on this brand's site, one for every language (e.g. 'E-moon'); '' = the site's own (Mr. Graft)."),
+        chat_bot_avatar_id: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("The assistant's round face (chat button, window header, replies): a square image; 0 = the site's own."),
+        chat_bot_welcome_image_id: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("The full figure on the chat's welcome card; 0 = the face (else the site's own)."),
         popup_enabled: z.boolean().optional(),
         popup_show_form: z
           .boolean()
