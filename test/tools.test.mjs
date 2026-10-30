@@ -1002,6 +1002,26 @@ test("update_package: PUT /admin/packages/{id} with price", async () => {
   assert.equal(lastBody().price, 2500);
 });
 
+test("packages: style (1 the original cards, 2 the v8 price table) on create and update", async () => {
+  await call("create_package", { project: PROJECT, language_id: 22, title: "VIP", style: 2 });
+  assert.ok(lastCall().url.endsWith("/admin/packages"));
+  assert.equal(lastBody().style, 2);
+
+  await call("update_package", { project: PROJECT, package_id: 3, style: 1 });
+  assert.equal(lastCall().method, "PUT");
+  assert.deepEqual(lastBody(), { style: 1 });
+
+  await call("update_package", { project: PROJECT, package_id: 3, price: 2500 });
+  assert.ok(!("style" in lastBody()), "a style left out must stay as it is");
+
+  for (const tool of ["create_package", "update_package"]) {
+    const schema = definitions.get(tool).inputSchema.style;
+    assert.ok(schema.safeParse(2).success, tool);
+    assert.ok(!schema.safeParse(3).success, tool);
+    assert.ok(!schema.safeParse("2").success, tool);
+  }
+});
+
 test("list_price_compares: GET /admin/price-compares", async () => {
   await call("list_price_compares", { project: PROJECT });
   assert.equal(lastCall().method, "GET");

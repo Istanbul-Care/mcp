@@ -640,18 +640,25 @@ export function registerComponentTools(server: McpServer): void {
   // ---- Packages ----------------------------------------------------------
   registerListDelete(server, { entity: "package", collection: "packages", label: "packages" });
 
+  const PACKAGE_STYLE_TEXT =
+    "The design. 1 (or unset): the original cards. 2: the v8 price table — the packages side " +
+    "by side with their name, price, line and button lined up across all of them, then each " +
+    "one's offers; the recommended section (is_recommended) is highlighted.";
+  const packageStyleParam = z.union([z.literal(1), z.literal(2)]);
+
   server.registerTool(
     "create_package",
     {
       title: "Create a package",
       description:
-        "Creates a pricing package with its first-language title and optional sections/offers. " +
-        "Requires login.",
+        "Creates a pricing package with its first-language title and optional sections/offers, " +
+        "in the original cards (style 1) or the v8 price table (style 2). Requires login.",
       inputSchema: {
         project: projectParam,
         language_id: z.number().int(),
         title: z.string(),
         is_featured: z.boolean().optional(),
+        style: packageStyleParam.optional().describe(PACKAGE_STYLE_TEXT),
         sections: z
           .array(z.record(z.unknown()))
           .optional()
@@ -661,11 +668,12 @@ export function registerComponentTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
-    async ({ project, language_id, title, is_featured, sections }) =>
+    async ({ project, language_id, title, is_featured, style, sections }) =>
       guard(() =>
         createEntity(project, "/admin/packages", {
           translation: { language_id, title },
           is_featured,
+          style,
           sections,
         }),
       ),
@@ -676,12 +684,16 @@ export function registerComponentTools(server: McpServer): void {
     {
       title: "Update a package",
       description:
-        "Edits a package's price / featured flag. Pass only what changes. Requires login.",
+        "Edits a package's price / featured flag / design (style). Pass only what changes. " +
+        "Requires login.",
       inputSchema: {
         project: projectParam,
         package_id: z.number().int(),
         price: z.number().optional(),
         is_featured: z.boolean().optional(),
+        style: packageStyleParam
+          .optional()
+          .describe(`${PACKAGE_STYLE_TEXT} Leave it out to keep the current one.`),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
