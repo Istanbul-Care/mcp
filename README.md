@@ -98,7 +98,7 @@ agent is doing the writing.
 | `create_post_draft` / `update_post_translation` / `add_translation` / `set_post_metadata` | ✓ | Author a post (draft-first) |
 | `publish_post` / `unpublish_post` | ✓ | Go live (SEO-gated) / return to draft |
 | `auto_translate` / `_status` / `_rollback` | ✓ | Machine-translate one post, service or page |
-| `translation_coverage` | ✓ | What is untranslated, across all 32 surfaces |
+| `translation_coverage` | ✓ | What is untranslated, across all 34 surfaces |
 | `translate_everything` / `_status` | ✓ | Brand-wide sweep, throttled |
 | `translation_worklist` / `save_translations` | ✓ | The surfaces no backend endpoint translates |
 | `create_post_category` / `add_category_translation` | ✓ | Create/translate a category |
@@ -116,6 +116,9 @@ agent is doing the writing.
 | `update_hero` / `update_slider` / `update_process` / `update_price_compare` / `update_promotional_landing` / `update_before_after` | ✓ | Edit a component after it exists |
 | `create_process` / `update_process` / `update_process_translation` / `create_process_step` / `update_process_step` | ✓ | A "how it works" block: `style` 1 (the recovery roadmap) or 2 (the v8 journey on the brand's navy: `eyebrow` over the title, a straight line of numbered steps, each a card with its photo); a step's photo (`image_id`) is the step's, the same in every language; inline steps on `create_process` carry their first-language text flat (`title`, `description`, `icon`) |
 | `create_hero_feature` / `create_slide` / `create_slide_feature` / `create_process_step` / `create_price_compare_country` / `create_promo_feature` / `create_gallery_item` | ✓ | Add one child row (each with `update_*` and `delete_*`) |
+| `create_before_after` / `update_before_after` / `create_gallery_item` / `update_gallery_item` | ✓ | A before/after gallery and its cases; `style` `style_5` shows each case from several angles with a category filter, using the case's `angle_id` (its own pair's angle), `views` (its other angles, each with a before and an after photo, each angle once per case), `category_ids` and `months_after`; on update `angle_id` / `months_after` null clears them, and `views` / `category_ids` replace the whole stored list |
+| `list_before_after_angles` / `create_before_after_angle` / `update_before_after_angle` / `delete_before_after_angle` | ✓ | The brand's angles (Front, Left, Right, Top…), a name per language and an order — create them before the cases point at them; one in use is deleted only with `force` (the cases' views at it go, the media files stay) |
+| `list_before_after_categories` / `create_before_after_category` / `update_before_after_category` / `delete_before_after_category` | ✓ | The brand's before/after categories (FUE, DHI, Afro, Women…) the style_5 gallery filters by, the same shape; `force` deletes one in use (its cases just leave it) |
 | `create_package_section` / `create_offer` | ✓ | Build a pricing table tier by tier (price and currency are per-language) |
 | `list_links` / `create_link` / `update_link` / `delete_link` | ✓ | The reusable CTA buttons other blocks point at |
 | `create_global_setting` / `update_global_setting` | ✓ | The brand's site-wide settings, and its Instagram / TikTok / YouTube embeds (`embed_media`, shown by a page's social media block; for the patient stories each carries `person_name` (full name), `title` (the line under it), `tag` (a chip, e.g. "Long FUE"), `country_code` (ISO alpha-2, the country chip), with `poster_id` as the face and the phone's cover; `duration_seconds` is kept but not shown). A save replaces the whole embed list, so send every item with all its fields (`get_component` global_setting first) |
@@ -178,10 +181,10 @@ Underneath it, a brand's content splits in two:
 - **Posts, services and pages** have a backend endpoint that runs the
   translation server-side (DeepSeek), re-localises internal links, caps meta at
   SEO sizes and emits ASCII slugs. `translate_everything` queues those.
-- **The other 29 surfaces** — taxonomy, FAQs, cards, heroes, sliders, packages,
-  price comparisons, processes, promotional landings, before/afters, forms,
-  menus, global settings, CTA link buttons, image alt text — have
-  translation CRUD and nothing else. No endpoint translates them, so the agent
+- **The other 31 surfaces** — taxonomy, FAQs, cards, heroes, sliders, packages,
+  price comparisons, processes, promotional landings, before/afters (and their
+  angle and category names), forms, menus, global settings, CTA link buttons,
+  image alt text — have translation CRUD and nothing else. No endpoint translates them, so the agent
   holding the session is the translator: `translation_worklist` hands it the
   source strings, `save_translations` writes its rendering back. This is the
   idiomatic MCP split — the server is the hands, the model is the translator.
@@ -189,10 +192,10 @@ Underneath it, a brand's content splits in two:
   auto-translate endpoint for these types, like posts/services/pages already
   have — not a second LLM inside the MCP.)
 
-  Two of these don't go through a `/translations` endpoint at all: **CTA links**
-  and **before/after-AI steps** carry their languages inside the row, written by
-  PUTting the whole set back (`save_translations` re-sends the other languages so
-  they aren't dropped). **Image alt text** is the one high-volume surface — the
+  Four of these don't go through a `/translations` endpoint at all: **CTA links**,
+  **before/after-AI steps** and the **before/after angles and categories** carry
+  their languages inside the row, written by PUTting the whole set back
+  (`save_translations` re-sends the other languages so they aren't dropped). **Image alt text** is the one high-volume surface — the
   media library is far larger than the content, so translating it is best run as
   its own pass (`types: ["media"]`) rather than folded into a content sweep.
 

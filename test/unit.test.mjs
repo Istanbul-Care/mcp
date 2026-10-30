@@ -102,6 +102,19 @@ test("registry: every surface's titleField is one of its own fields", () => {
   }
 });
 
+test("registry: before/after angle and category names are embedded, keyed by code", () => {
+  for (const [type, collection] of [["before_after_angle", "angles"], ["before_after_category", "categories"]]) {
+    const surface = getSurface(type);
+    assert.equal(surface.source.path, `/admin/before-afters/${collection}`);
+    assert.deepEqual(surface.write, {
+      mode: "embedded",
+      put: `/admin/before-afters/${collection}/{id}`,
+      key: "language_code",
+    });
+    assert.deepEqual(surface.fields.map((f) => f.name), ["name"]);
+  }
+});
+
 test("registry: getSurface throws on an unknown type", () => {
   assert.throws(() => getSurface("does-not-exist"), /Unknown content type/);
   assert.equal(getSurface("post").type, "post");

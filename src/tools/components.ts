@@ -1,8 +1,8 @@
 /**
  * Structural CRUD for the remaining page components — the building blocks that
  * make up a brand's landing pages: sliders, heroes, processes, packages,
- * price-compares, promotional-landings, before-afters, google-map-sections, doctors,
- * redirects and global-settings.
+ * price-compares, promotional-landings, before-afters (and their angles and
+ * categories), google-map-sections, doctors, redirects and global-settings.
  *
  * Translations of these live through the registry-driven translate_* tools;
  * these tools create/update/delete the components themselves. Nested children
@@ -23,6 +23,7 @@ import {
   PROCESS_STYLE_TEXT,
   processStyleParam,
 } from "./process-fields.js";
+import { BEFORE_AFTER_STYLE_TEXT, caseFields } from "./before-after-fields.js";
 
 /**
  * Create responses come in two shapes: most wrap the new row under `data`
@@ -132,6 +133,131 @@ function registerListDelete(
         const project = args.project;
         await del(project, `/admin/${collection}/${args[idParam]}`);
         return ok({ project, [idParam]: args[idParam], deleted: true });
+      }),
+  );
+}
+
+/**
+ * list / create / update / delete for one of a brand's two before/after lists
+ * (angles, categories) — /admin/before-afters/{angles|categories}. The list is
+ * short and unpaged, so it comes back whole, every language's name included.
+ */
+function registerBeforeAfterList(
+  server: McpServer,
+  opts: {
+    collection: "angles" | "categories";
+    entity: "angle" | "category";
+    /** What the list is for. */
+    what: string;
+    example: string;
+    /** What force=true does to the cases using one. */
+    inUse: string;
+  },
+): void {
+  const { collection, entity, what, example, inUse } = opts;
+  const base = `/admin/before-afters/${collection}`;
+  const idParam = `${entity}_id`;
+
+  const nameIn = (create: boolean) =>
+    z.object({
+      language_code: z.string().optional().describe("e.g. 'en' (or give language_id)."),
+      language_id: z.number().int().optional().describe("list_languages (or give language_code)."),
+      name: (create ? z.string().min(1) : z.string())
+        .max(100)
+        .describe(
+          create
+            ? `The name in that language, e.g. ${example}.`
+            : `The name in that language; "" removes that language's name.`,
+        ),
+    });
+
+  server.registerTool(
+    `list_before_after_${collection}`,
+    {
+      title: `List the before/after ${collection}`,
+      description:
+        `The brand's before/after ${collection}: ${what}. Each with its id, sort_order, name (the ` +
+        "default language's), every language's name and usage_count (the cases using it). " +
+        "Requires login.",
+      inputSchema: { project: projectParam },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ project }) =>
+      guard(async () => {
+        const response = await get<Envelope<unknown>>(project, base);
+        return ok({ project, [collection]: response.data });
+      }),
+  );
+
+  server.registerTool(
+    `create_before_after_${entity}`,
+    {
+      title: `Add a before/after ${entity}`,
+      description:
+        `Adds one of the brand's before/after ${collection} — ${what}. Give its name in each ` +
+        "language you have (at least one; a language without one shows the default " +
+        "language's on the site). Requires login.",
+      inputSchema: {
+        project: projectParam,
+        sort_order: z.number().int().min(0).optional().describe("Lower comes first; ties by id."),
+        translations: z.array(nameIn(true)).min(1).describe("A name per language."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, ...body }) =>
+      guard(async () => {
+        const response = await post<Envelope<{ id?: number }>>(project, base, body);
+        return ok({ project, created: true, id: response.data?.id, [entity]: response.data });
+      }),
+  );
+
+  server.registerTool(
+    `update_before_after_${entity}`,
+    {
+      title: `Update a before/after ${entity}`,
+      description:
+        `Renames or reorders one of the brand's before/after ${collection}. Only the languages ` +
+        "sent change, the others are kept; at least one name must remain. The pages showing " +
+        "a style_5 gallery are rebuilt. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        [idParam]: z.number().int().describe(`From list_before_after_${collection}.`),
+        sort_order: z.number().int().min(0).optional(),
+        translations: z.array(nameIn(false)).optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async (args) =>
+      guard(async () => {
+        const { project, [idParam]: id, ...body } = args as Record<string, any>;
+        const response = await put<Envelope<unknown>>(project, `${base}/${id}`, body);
+        return ok({ project, [idParam]: id, updated: true, [entity]: response.data });
+      }),
+  );
+
+  server.registerTool(
+    `delete_before_after_${entity}`,
+    {
+      title: `Delete a before/after ${entity}`,
+      description:
+        `Removes one of the brand's before/after ${collection}. One in use (usage_count > 0) is ` +
+        `refused (409) unless force is true; with force ${inUse}. Requires login.`,
+      inputSchema: {
+        project: projectParam,
+        [idParam]: z.number().int().describe(`From list_before_after_${collection}.`),
+        force: z
+          .boolean()
+          .optional()
+          .describe("true deletes it even when cases use it. Default false."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    async (args) =>
+      guard(async () => {
+        const { project, [idParam]: id, force } = args as Record<string, any>;
+        const forced = force === true;
+        await del(project, `${base}/${id}?force=${forced}`);
+        return ok({ project, [idParam]: id, deleted: true, forced });
       }),
   );
 }
@@ -649,18 +775,24 @@ export function registerComponentTools(server: McpServer): void {
     {
       title: "Create a before/after gallery",
       description:
-        "Creates a before/after gallery block with optional inline image pairs. Requires login.",
+        "Creates a before/after gallery block with optional inline cases (gallery_items; add " +
+        "more later with create_gallery_item). For style_5 create the brand's angles and " +
+        "categories first (create_before_after_angle / create_before_after_category), then " +
+        "give each case its angle_id, views, category_ids and months_after. Requires login.",
       inputSchema: {
         project: projectParam,
-        language_id: z.number().int().optional(),
+        language_id: z.number().int().optional().describe("Language of title/description."),
         sort_order: z.number().int().optional(),
-        style: z.string().optional(),
+        style: z.string().optional().describe(BEFORE_AFTER_STYLE_TEXT),
         title: z.string().optional(),
         description: z.string().optional(),
         gallery_items: z
-          .array(z.record(z.unknown()))
+          .array(z.object(caseFields))
           .optional()
-          .describe("Before/after pairs: [{ before_image_id, after_image_id, ... }]."),
+          .describe(
+            "The cases: [{ before_media_id, after_media_id, sex, technique, graft, age, " +
+              "sort_order, angle_id, months_after, category_ids, views }], each field optional.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
@@ -671,6 +803,32 @@ export function registerComponentTools(server: McpServer): void {
         ]),
       ),
   );
+
+  // ---- Before/after angles and categories --------------------------------
+  // Two lists the brand keeps, the same shape: a name per language and an
+  // order. A style_5 case points at them (angle_id, views[].angle_id,
+  // category_ids), so they are created before the cases.
+  registerBeforeAfterList(server, {
+    collection: "angles",
+    entity: "angle",
+    what:
+      "the sides a case is photographed from (Front, Left, Right, Top…). A case's own pair " +
+      "has one (angle_id) and its other photos one each (views); the style_5 gallery shows " +
+      "them in this list's order",
+    example: "'Front'",
+    inUse:
+      "the cases' photos at that angle (their views) are removed — the media files stay in " +
+      "the library — and a case whose own pair had it keeps the pair, without an angle",
+  });
+  registerBeforeAfterList(server, {
+    collection: "categories",
+    entity: "category",
+    what:
+      "what the style_5 gallery filters by (FUE, DHI, Afro, Women…); a case can be in several " +
+      "(category_ids), and each section shows the categories its cases are in with their counts",
+    example: "'Afro'",
+    inUse: "the cases in it just leave it",
+  });
 
   // ---- Global settings ---------------------------------------------------
   registerListDelete(server, {

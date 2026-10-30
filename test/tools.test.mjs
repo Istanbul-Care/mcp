@@ -1014,6 +1014,114 @@ test("delete_before_after: DELETE /admin/before-afters/{id}", async () => {
   assert.ok(lastCall().url.endsWith("/admin/before-afters/9"));
 });
 
+test("create_gallery_item: a style_5 case carries its angle, views, categories and months", async () => {
+  const r = await call("create_gallery_item", {
+    project: PROJECT,
+    before_after_id: 9,
+    before_media_id: 1,
+    after_media_id: 2,
+    angle_id: 3,
+    months_after: 12,
+    category_ids: [7, 8],
+    views: [{ angle_id: 4, before_media_id: 5, after_media_id: 6 }],
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "POST");
+  assert.ok(lastCall().url.endsWith("/admin/before-afters/9/gallery-items"));
+  assert.deepEqual(lastBody(), {
+    before_media_id: 1,
+    after_media_id: 2,
+    angle_id: 3,
+    months_after: 12,
+    category_ids: [7, 8],
+    views: [{ angle_id: 4, before_media_id: 5, after_media_id: 6 }],
+  });
+});
+
+test("update_gallery_item: null clears, [] replaces, a field left out is not sent", async () => {
+  await call("update_gallery_item", {
+    project: PROJECT,
+    gallery_item_id: 11,
+    angle_id: null,
+    months_after: null,
+    views: [],
+  });
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/before-afters/gallery-items/11"));
+  const body = lastBody();
+  assert.deepEqual(body, { angle_id: null, months_after: null, views: [] });
+  assert.ok(!("category_ids" in body), "an omitted list must stay unchanged, not be cleared");
+});
+
+test("create_before_after: inline cases keep the style_5 fields; style_5 is accepted", async () => {
+  const r = await call("create_before_after", {
+    project: PROJECT,
+    style: "style_5",
+    gallery_items: [{ before_media_id: 1, angle_id: 3, category_ids: [7], months_after: 6 }],
+  });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().gallery_items[0], {
+    before_media_id: 1,
+    angle_id: 3,
+    category_ids: [7],
+    months_after: 6,
+  });
+  const schema = definitions.get("create_before_after").inputSchema.gallery_items;
+  const parsed = schema.parse([{ angle_id: 3, views: [{ angle_id: 4, after_media_id: 2 }], junk: 1 }]);
+  assert.deepEqual(parsed, [{ angle_id: 3, views: [{ angle_id: 4, after_media_id: 2 }] }]);
+  assert.ok(!schema.safeParse([{ months_after: 601 }]).success);
+});
+
+test("before/after angles and categories: list / create / update / delete", async () => {
+  for (const [collection, entity] of [["angles", "angle"], ["categories", "category"]]) {
+    await call(`list_before_after_${collection}`, { project: PROJECT });
+    assert.equal(lastCall().method, "GET");
+    assert.ok(lastCall().url.endsWith(`/admin/before-afters/${collection}`), lastCall().url);
+
+    const translations = [{ language_code: "en", name: "Front" }, { language_id: 45, name: "Ön" }];
+    const created = await call(`create_before_after_${entity}`, { project: PROJECT, sort_order: 1, translations });
+    assert.ok(!isError(created));
+    assert.equal(lastCall().method, "POST");
+    assert.ok(lastCall().url.endsWith(`/admin/before-afters/${collection}`));
+    assert.deepEqual(lastBody(), { sort_order: 1, translations });
+    assert.equal(JSON.parse(created.content[0].text).id, 123);
+
+    await call(`update_before_after_${entity}`, {
+      project: PROJECT,
+      [`${entity}_id`]: 4,
+      translations: [{ language_code: "ar", name: "" }],
+    });
+    assert.equal(lastCall().method, "PUT");
+    assert.ok(lastCall().url.endsWith(`/admin/before-afters/${collection}/4`));
+    assert.deepEqual(lastBody(), { translations: [{ language_code: "ar", name: "" }] });
+
+    await call(`delete_before_after_${entity}`, { project: PROJECT, [`${entity}_id`]: 4 });
+    assert.equal(lastCall().method, "DELETE");
+    assert.ok(lastCall().url.endsWith(`/admin/before-afters/${collection}/4?force=false`), lastCall().url);
+    await call(`delete_before_after_${entity}`, { project: PROJECT, [`${entity}_id`]: 4, force: true });
+    assert.ok(lastCall().url.endsWith(`/admin/before-afters/${collection}/4?force=true`));
+    assert.equal(definitions.get(`delete_before_after_${entity}`).annotations.destructiveHint, true);
+
+    // A new name needs text; an update may send "" to remove one language's.
+    const createNames = definitions.get(`create_before_after_${entity}`).inputSchema.translations;
+    assert.ok(!createNames.safeParse([{ language_code: "en", name: "" }]).success);
+    assert.ok(!createNames.safeParse([]).success);
+  }
+});
+
+test("delete_before_after_angle: a 409 in-use refusal reaches the agent", async () => {
+  globalThis.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), method: opts.method });
+    return new Response(
+      JSON.stringify({ detail: "3 case(s) have photos at this angle. Send force=true to delete it anyway." }),
+      { status: 409, headers: { "content-type": "application/json" } },
+    );
+  };
+  const r = await call("delete_before_after_angle", { project: PROJECT, angle_id: 4 });
+  assert.ok(isError(r));
+  assert.match(r.content[0].text, /409.*force=true/);
+});
+
 test("create_global_setting: nests contact block into translation", async () => {
   await call("create_global_setting", {
     project: PROJECT,
@@ -1610,6 +1718,69 @@ test("save_translations: a header item's mega texts are written with its label",
     description: "الطيران والفندق مشمولان",
     highlight: "من 1990$",
     language_id: 45,
+  });
+});
+
+// --- before/after angles: their names ride along in the translation sweep -----
+
+function angleFetch() {
+  return routedFetch({
+    "/admin/languages": EN_AR_LANGUAGES,
+    // The list is the bare row array, no pagination.
+    "/admin/before-afters/angles": {
+      status: "success",
+      data: [
+        {
+          id: 4,
+          sort_order: 0,
+          name: "Front",
+          usage_count: 2,
+          translations: [
+            { language_id: 22, language_code: "en", name: "Front" },
+            { language_id: 46, language_code: "tr", name: "Ön" },
+          ],
+        },
+      ],
+    },
+  });
+}
+
+test("translation_worklist: a before/after angle hands over its name", async () => {
+  globalThis.fetch = angleFetch();
+  setSession(FOOTER_PROJECT, "test-token", 60, { id: 1, email: "t@t.com", full_name: "Test", role: "admin" });
+  const r = await call("translation_worklist", {
+    project: FOOTER_PROJECT,
+    target_language_code: "ar",
+    source_language_code: "en",
+    types: ["before_after_angle"],
+    limit: 25,
+  });
+  assert.ok(!isError(r), r.content?.[0]?.text);
+  const out = JSON.parse(r.content[0].text);
+  assert.equal(out.items.length, 1);
+  assert.equal(out.items[0].id, 4);
+  assert.deepEqual(out.items[0].fields, { name: "Front" });
+});
+
+test("save_translations: a before/after angle's name is PUT with the other languages kept", async () => {
+  globalThis.fetch = angleFetch();
+  setSession(FOOTER_PROJECT, "test-token", 60, { id: 1, email: "t@t.com", full_name: "Test", role: "admin" });
+  const r = await call("save_translations", {
+    project: FOOTER_PROJECT,
+    language_code: "ar",
+    source_language_code: "en",
+    localize_urls: false,
+    items: [{ type: "before_after_angle", id: 4, fields: { name: "أمامي" } }],
+  });
+  assert.ok(!isError(r), r.content?.[0]?.text);
+  const write = calls.find((c) => c.method === "PUT");
+  assert.ok(write.url.endsWith("/admin/before-afters/angles/4"), write.url);
+  assert.deepEqual(JSON.parse(write.body), {
+    translations: [
+      { language_code: "en", name: "Front" },
+      { language_code: "tr", name: "Ön" },
+      { language_code: "ar", name: "أمامي" },
+    ],
   });
 });
 

@@ -81,7 +81,8 @@ export type TranslationWrite =
        * Some entities have no /translations endpoint at all — their translations
        * live inside the row and are written by PUTting the row with the FULL set
        * of translations (languages left out are deleted). Before/after-AI steps
-       * and links work this way.
+       * and links work this way; before/after angles and categories take the
+       * same shape (though their PUT keeps the languages left out).
        */
       mode: "embedded";
       put: string;
@@ -336,6 +337,28 @@ export const SURFACES: TranslatableSurface[] = [
     write: endpoint("/admin/before-afters"),
     titleField: "title",
     fields: [t("title"), t("description")],
+  },
+  {
+    // The brand's two before/after lists (style_5): a name per language inside
+    // the row, no /translations endpoint, and `data` is the bare row array. The
+    // PUT changes only the languages it is sent, so re-sending the others (as
+    // the embedded write does) leaves them as they are.
+    type: "before_after_angle",
+    label: "Before/after angle",
+    llm: null,
+    source: { path: "/admin/before-afters/angles", key: "angles" },
+    write: { mode: "embedded", put: "/admin/before-afters/angles/{id}", key: "language_code" },
+    titleField: "name",
+    fields: [t("name", 100)],
+  },
+  {
+    type: "before_after_category",
+    label: "Before/after category",
+    llm: null,
+    source: { path: "/admin/before-afters/categories", key: "categories" },
+    write: { mode: "embedded", put: "/admin/before-afters/categories/{id}", key: "language_code" },
+    titleField: "name",
+    fields: [t("name", 100)],
   },
   {
     type: "package",

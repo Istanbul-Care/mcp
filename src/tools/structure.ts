@@ -43,6 +43,14 @@ import {
   PROCESS_STYLE_TEXT,
   processStyleParam,
 } from "./process-fields.js";
+import {
+  BEFORE_AFTER_STYLE_TEXT,
+  caseAngleParam,
+  caseCategoryIdsParam,
+  caseMonthsAfterParam,
+  caseTagFields,
+  caseViewsParam,
+} from "./before-after-fields.js";
 
 const languageId = z
   .number()
@@ -859,7 +867,7 @@ export function registerStructureTools(server: McpServer): void {
       "Remember that every style_4 record on a page merges into a single filterable gallery.",
     params: {
       before_after_id: z.number().int(),
-      style: z.string().optional().describe("style_1 … style_4."),
+      style: z.string().optional().describe(BEFORE_AFTER_STYLE_TEXT),
       sort_order: sortOrder,
       language_id: z.number().int().optional(),
       title: z.string().optional(),
@@ -880,9 +888,11 @@ export function registerStructureTools(server: McpServer): void {
     name: "create_gallery_item",
     title: "Add a before/after pair",
     description:
-      "Adds one patient's before and after images. The four descriptive fields are the " +
-      "filter chips on the style_4 gallery, so spell them exactly as the existing rows do — " +
-      "'Female' and 'female' become two separate filters.",
+      "Adds one patient's case: the before and after images. The four descriptive fields are " +
+      "the filter chips on the style_4 gallery, so spell them exactly as the existing rows " +
+      "do — 'Female' and 'female' become two separate filters. The style_5 gallery uses " +
+      "angle_id, views, category_ids and months_after instead; the angles and categories " +
+      "must exist first (list_before_after_angles / list_before_after_categories).",
     params: {
       before_after_id: z.number().int(),
       before_media_id: z.number().int().optional(),
@@ -892,6 +902,10 @@ export function registerStructureTools(server: McpServer): void {
       graft: z.string().optional(),
       age: z.string().optional(),
       sort_order: sortOrder,
+      angle_id: caseAngleParam.optional(),
+      months_after: caseMonthsAfterParam.optional(),
+      category_ids: caseCategoryIdsParam.optional(),
+      views: caseViewsParam.optional(),
     },
     method: "post",
     path: (a) => `/admin/before-afters/${a.before_after_id}/gallery-items`,
@@ -903,6 +917,7 @@ export function registerStructureTools(server: McpServer): void {
       graft: a.graft,
       age: a.age,
       sort_order: a.sort_order,
+      ...caseTagFields(a),
     }),
     echo: ["before_after_id"],
   });
@@ -910,7 +925,11 @@ export function registerStructureTools(server: McpServer): void {
   registerWrite(server, {
     name: "update_gallery_item",
     title: "Update a before/after pair",
-    description: "Changes one pair's images, filter labels or position.",
+    description:
+      "Changes one case's images, filter labels or position, and for style_5 its angle, " +
+      "months, categories and other angles. Pass only what changes: angle_id / months_after " +
+      "null clears them; category_ids and views each replace the whole stored list. Read the " +
+      "case first with get_component before_after.",
     params: {
       gallery_item_id: z.number().int(),
       before_media_id: z.number().int().optional(),
@@ -920,6 +939,10 @@ export function registerStructureTools(server: McpServer): void {
       graft: z.string().optional(),
       age: z.string().optional(),
       sort_order: sortOrder,
+      angle_id: caseAngleParam.optional(),
+      months_after: caseMonthsAfterParam.optional(),
+      category_ids: caseCategoryIdsParam.optional(),
+      views: caseViewsParam.optional(),
     },
     method: "put",
     path: (a) => `/admin/before-afters/gallery-items/${a.gallery_item_id}`,
@@ -931,6 +954,7 @@ export function registerStructureTools(server: McpServer): void {
       graft: a.graft,
       age: a.age,
       sort_order: a.sort_order,
+      ...caseTagFields(a),
     }),
     echo: ["gallery_item_id"],
   });

@@ -64,9 +64,10 @@ for (const [path, item] of Object.entries(spec.paths)) {
 
 /**
  * Embedded surfaces: an entity that carries a `translations` array in its
- * create/update body but has NO /translations endpoint. `link` and
- * `before_after_ai_step` are the two today — this is exactly the shape that
- * slips past a /translations-only scan, so catch it explicitly.
+ * create/update body but has NO /translations endpoint. `link`,
+ * `before_after_ai_step` and the before/after angles and categories today —
+ * this is exactly the shape that slips past a /translations-only scan, so
+ * catch it explicitly.
  */
 function bodyHasTranslations(operation) {
   const schema = deref(

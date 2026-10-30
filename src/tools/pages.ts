@@ -1061,7 +1061,7 @@ export function registerPageTools(server: McpServer): void {
           .optional()
           .describe(
             "All style_4 galleries on a page merge into one filterable block using the " +
-              "first one's order; style_1–3 each render separately.",
+              "first one's order; style_1–3 and style_5 each render separately.",
           ),
         packages: orderedItems.optional(),
         price_compares: orderedItems.optional(),

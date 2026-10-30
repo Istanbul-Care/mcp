@@ -147,8 +147,9 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
       { value: "style_2", label: "Transformation showcase" },
       { value: "style_3", label: "Clinical results grid" },
       { value: "style_4", label: "Before/after hero", note: "All style_4 records on a page merge into one filterable gallery, using only the first one's order." },
+      { value: "style_5", label: "Cases by angle", note: "Each case's photos from several angles with a category filter. Uses each case's angle_id (its own pair's angle), views (its other angles), category_ids and months_after, not the sex/technique/graft/age chips. The angles and categories are lists the brand keeps, a name per language: create them first (create_before_after_angle / create_before_after_category), then set them on the cases (create_gallery_item / update_gallery_item)." },
     ],
-    on_unknown: "The record is not rendered in any of the four layouts.",
+    on_unknown: "The record is not rendered in any of the five layouts.",
   },
 
   faq_style: {

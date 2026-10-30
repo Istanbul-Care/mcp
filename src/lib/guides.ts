@@ -107,6 +107,17 @@ slides, and in the mixed case it gathers the timeline half by looking for slide
 type \`image\`. A styleless slider holding real \`timeline\` slides next to
 \`showcase\` ones renders the showcase slides and silently drops the rest.
 
+**A style_5 before/after needs its lists first.** Its cases are shown from
+several angles with a category filter, and both are lists the brand keeps, a
+name per language: create_before_after_angle (Front, Left, Right, Top…) and
+create_before_after_category (FUE, DHI, Afro, Women…). Then give each case
+(create_gallery_item / update_gallery_item) its own pair's \`angle_id\`, its
+other angles as \`views\` (each angle once per case), its \`category_ids\` and
+\`months_after\`. On update \`views\` and \`category_ids\` replace the whole stored
+list. Deleting an angle in use needs \`force\` and takes the cases' views at it
+away (the media files stay); a category in use, the same, and its cases just
+leave it.
+
 **Two-step children.** A process step is created with only a number and a
 position; without a following step translation it renders blank. The same is
 true of any child whose create call takes no \`translation\`.
