@@ -1,7 +1,7 @@
 /**
  * Structural CRUD for the remaining page components — the building blocks that
  * make up a brand's landing pages: sliders, heroes, processes, packages,
- * price-compares, promotional-landings, before-afters, google-map-sections,
+ * price-compares, promotional-landings, before-afters, google-map-sections, doctors,
  * redirects and global-settings.
  *
  * Translations of these live through the registry-driven translate_* tools;
@@ -248,6 +248,99 @@ export function registerComponentTools(server: McpServer): void {
       guard(async () => {
         await put(project, `/admin/google-map-sections/${google_map_section_id}`, body);
         return ok({ project, google_map_section_id, updated: true });
+      }),
+  );
+
+  // ---- Doctors -----------------------------------------------------------
+  registerListDelete(server, { entity: "doctor", collection: "doctors", label: "doctors" });
+
+  const doctorTranslations = z
+    .array(
+      z.object({
+        language_id: z.number().int(),
+        title: z.string().max(150).nullable().optional().describe("e.g. 'Hair Transplant Doctor'."),
+        quote: z.string().max(300).nullable().optional().describe("A line in their words, no quote marks."),
+        bio: z.string().nullable().optional().describe("A short paragraph, plain text."),
+        specialties: z
+          .string()
+          .max(300)
+          .nullable()
+          .optional()
+          .describe("Comma-separated: 'FUE, DHI, Hairline design' (one line on the site)."),
+      }),
+    )
+    .describe(
+      "Per language. The languages given are written, the others kept; a language without text " +
+        "shows the default language's on the site.",
+    );
+  const doctorFields = {
+    photo_id: z.number().int().nullable().optional().describe("A portrait IMAGE of the media library (4:5 crop, face at the top)."),
+    profile_page_id: z
+      .number()
+      .int()
+      .nullable()
+      .optional()
+      .describe("The doctor's own page; 'View full profile' opens it in the visitor's language."),
+    stat_procedures: z.string().max(30).nullable().optional().describe("As it should read: '6,000+'."),
+    stat_patients: z.string().max(30).nullable().optional().describe("'9,000+'"),
+    stat_years: z.string().max(30).nullable().optional().describe("Years of experience: '20+'."),
+    is_active: z.boolean().optional().describe("false hides them on every page."),
+  };
+
+  server.registerTool(
+    "get_doctor",
+    {
+      title: "Read one doctor",
+      description: "One of the brand's doctors with every language's text. Requires login.",
+      inputSchema: { project: projectParam, doctor_id: z.number().int() },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ project, doctor_id }) =>
+      guard(async () => {
+        const response = await get<Envelope<unknown>>(project, `/admin/doctors/${doctor_id}`);
+        return ok({ project, doctor: response.data });
+      }),
+  );
+
+  server.registerTool(
+    "create_doctor",
+    {
+      title: "Add a doctor",
+      description:
+        "Adds one of the brand's doctors, shown by a page's Doctors block (update_page `doctors`): " +
+        "a name tab each, the picked one's profile — portrait, title, name, quote, bio, the three " +
+        "figures, what they do, 'Ask … on WhatsApp' and their profile link. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        name: z.string().min(1).max(150).describe("As shown in every language: 'Dr. Asil Onay'."),
+        ...doctorFields,
+        translations: doctorTranslations.optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, ...body }) => guard(() => createEntity(project, "/admin/doctors", body)),
+  );
+
+  server.registerTool(
+    "update_doctor",
+    {
+      title: "Update a doctor",
+      description:
+        "Edits a doctor: pass only what changes; translations write the languages given. The pages " +
+        "showing them are rebuilt. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        doctor_id: z.number().int(),
+        name: z.string().min(1).max(150).optional(),
+        ...doctorFields,
+        translations: doctorTranslations.optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, doctor_id, ...body }) =>
+      guard(async () => {
+        await put(project, `/admin/doctors/${doctor_id}`, body);
+        return ok({ project, doctor_id, updated: true });
       }),
   );
 

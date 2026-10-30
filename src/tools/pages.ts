@@ -187,6 +187,18 @@ const layoutStyleParam = z
       "full width above; three titled blocks or more open with a contents list. Ignored on a page " +
       "that carries a post or a service.",
   );
+const doctorsBlockParam = z
+  .object({
+    enabled: z.boolean(),
+    order: z.number().int().min(0).optional(),
+    grid_columns: z.number().int().min(1).max(12).optional(),
+    doctor_ids: z.array(z.number().int()).describe("Which doctors (list_doctors), in tab order."),
+  })
+  .describe(
+    "The Doctors block: on the brand's navy, 'Know who plans your hairline', a name tab per " +
+      "doctor and the picked one's profile. Placed by `order` like the other blocks. The object " +
+      "you pass replaces the stored one.",
+  );
 const bannerVideoParam = z
   .number()
   .int()
@@ -205,6 +217,7 @@ interface PageDetail extends PageListItem, PageSections {
   author_id?: number | null;
   reviewer_id?: number | null;
   layout_style?: number | null;
+  doctors?: { enabled: boolean; order?: number; grid_columns?: number; doctor_ids: number[] } | null;
   footer_id?: number | null;
   featured_image_id?: number | null;
   page_content?: PageContentBlock | null;
@@ -604,6 +617,7 @@ export function registerPageTools(server: McpServer): void {
           author_id: pageDetail.author_id ?? null,
           reviewer_id: pageDetail.reviewer_id ?? null,
           layout_style: pageDetail.layout_style ?? 1,
+          doctors: pageDetail.doctors ?? null,
           footer_id: pageDetail.footer_id,
           featured_image_id: pageDetail.featured_image_id,
           page_content: pageDetail.page_content ?? null,
@@ -707,6 +721,7 @@ export function registerPageTools(server: McpServer): void {
         reviewer_id: pageReviewerParam.optional(),
         author_box: authorBoxParam.optional(),
         layout_style: layoutStyleParam.optional(),
+        doctors: doctorsBlockParam.optional(),
         sticky_whatsapp: stickyWhatsAppParam.optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -1024,6 +1039,7 @@ export function registerPageTools(server: McpServer): void {
         reviewer_id: pageReviewerParam.optional(),
         author_box: authorBoxParam.optional(),
         layout_style: layoutStyleParam.optional(),
+        doctors: doctorsBlockParam.optional(),
         header_id: z.number().int().optional(),
         header_style: headerStyleParam.optional(),
         footer_id: z.number().int().optional(),
