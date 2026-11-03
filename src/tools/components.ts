@@ -2,7 +2,7 @@
  * Structural CRUD for the remaining page components — the building blocks that
  * make up a brand's landing pages: sliders, heroes, processes, packages,
  * price-compares, promotional-landings, before-afters (and their angles and
- * categories), google-map-sections, doctors, redirects and global-settings.
+ * categories), google-map-sections, doctors, campaigns, redirects and global-settings.
  *
  * Translations of these live through the registry-driven translate_* tools;
  * these tools create/update/delete the components themselves. Nested children
@@ -467,6 +467,134 @@ export function registerComponentTools(server: McpServer): void {
       guard(async () => {
         await put(project, `/admin/doctors/${doctor_id}`, body);
         return ok({ project, doctor_id, updated: true });
+      }),
+  );
+
+  // ---- Campaigns ---------------------------------------------------------
+  // A seasonal look for the whole site (Black Friday, …), switched on and off.
+  registerListDelete(server, { entity: "campaign", collection: "campaigns", label: "campaigns" });
+
+  const hexColor = z
+    .string()
+    .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, "a colour is written #rrggbb")
+    .nullable()
+    .optional();
+  const campaignTranslations = z
+    .array(
+      z.object({
+        language_id: z.number().int(),
+        badge_text: z.string().max(60).nullable().optional().describe("The occasion's name as shown: 'BLACK FRIDAY'."),
+        discount_text: z.string().max(40).nullable().optional().describe("The offer in a few characters: '-30%'. Big in the popup, on the package ribbon."),
+        bar_text: z.string().max(200).nullable().optional().describe("The top bar's line: 'Up to 30% off every hair transplant package'."),
+        button_text: z.string().max(60).nullable().optional().describe("The bar's button: 'Claim the offer'."),
+        button_url: z
+          .string()
+          .max(500)
+          .nullable()
+          .optional()
+          .describe("The bar button's link: 'cta_url' (WhatsApp through the lead form), 'contact-form' (the contact form) or a page link."),
+        popup_eyebrow: z.string().max(120).nullable().optional(),
+        popup_title: z.string().max(200).nullable().optional(),
+        popup_description: z.string().nullable().optional().describe("Plain text, a line or two."),
+        popup_button_text: z.string().max(60).nullable().optional(),
+      }),
+    )
+    .describe(
+      "Per language. The languages given are written (every text of that language — send them all), the " +
+        "others kept. The site shows the campaign ONLY in languages that have texts.",
+    );
+  const campaignFields = {
+    theme: z
+      .string()
+      .optional()
+      .describe("The occasion's look on the site (vocabulary campaign_theme): 'black_friday', or 'custom' for the colours only."),
+    ends_at: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("ISO date-time with offset, e.g. '2026-11-30T23:59:00+03:00' (Istanbul). The countdown counts to it; after it the site shows nothing. null: until switched off."),
+    accent_color: hexColor.describe("'#rrggbb'; null = the theme's own (Black Friday: #f5c542)."),
+    background_color: hexColor.describe("'#rrggbb'; null = the theme's own (Black Friday: #0b0b0f)."),
+    text_color: hexColor.describe("'#rrggbb'; null = the theme's own (Black Friday: #ffffff)."),
+    show_bar: z.boolean().optional().describe("A slim bar across the top of every page: the offer and its button."),
+    show_countdown: z.boolean().optional().describe("The time left to ends_at, in the bar and the popup."),
+    show_popup: z.boolean().optional().describe("The popup in the campaign's look (picture, offer, the brand's popup form)."),
+    mark_packages: z.boolean().optional().describe("A ribbon with the offer on the price-table cards."),
+    tint_hero: z.boolean().optional().describe("The hero's coloured words take the accent colour."),
+    popup_image_id: z.number().int().nullable().optional().describe("An IMAGE of the media library for the popup; null removes it."),
+  };
+  const campaignVocabulary = (theme: unknown): Array<[string, unknown]> => [["campaign_theme", theme]];
+
+  server.registerTool(
+    "get_campaign",
+    {
+      title: "Read one campaign",
+      description: "One seasonal campaign with its colours, switches and every language's texts. Requires login.",
+      inputSchema: { project: projectParam, campaign_id: z.number().int() },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ project, campaign_id }) =>
+      guard(async () => {
+        const response = await get<Envelope<unknown>>(project, `/admin/campaigns/${campaign_id}`);
+        return ok({ project, campaign: response.data });
+      }),
+  );
+
+  server.registerTool(
+    "create_campaign",
+    {
+      title: "Create a campaign",
+      description:
+        "Creates a seasonal campaign (Black Friday, …): a site-wide look — top bar with countdown, the popup " +
+        "in its colours, a ribbon on the package cards, the hero's accent — that leaves the site's design as " +
+        "it is and goes away when switched off. One is on at a time: is_active true switches the others off. " +
+        "The site picks it up within a minute or two. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        name: z.string().min(1).max(120).describe("For the panel only: 'Black Friday 2026'."),
+        is_active: z.boolean().default(false).describe("Switch it on now (turns every other campaign off)."),
+        ...campaignFields,
+        translations: campaignTranslations.optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, ...body }) =>
+      guard(() => createEntity(project, "/admin/campaigns", body, campaignVocabulary(body.theme))),
+  );
+
+  server.registerTool(
+    "update_campaign",
+    {
+      title: "Update a campaign",
+      description:
+        "Edits a campaign, or switches it on/off (is_active; on switches the others off). Pass only what " +
+        "changes; translations write the languages given. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        campaign_id: z.number().int(),
+        name: z.string().min(1).max(120).optional(),
+        is_active: z.boolean().optional(),
+        ...campaignFields,
+        translations: campaignTranslations.optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, campaign_id, ...body }) =>
+      guard(async () => {
+        const badValue = ensureVocabulary(campaignVocabulary(body.theme));
+        if (badValue) return fail(badValue);
+        const response = await put<Envelope<{ is_active?: boolean; is_live?: boolean }>>(
+          project,
+          `/admin/campaigns/${campaign_id}`,
+          body,
+        );
+        return ok({
+          project,
+          campaign_id,
+          updated: true,
+          is_active: response?.data?.is_active,
+          is_live: response?.data?.is_live,
+        });
       }),
   );
 

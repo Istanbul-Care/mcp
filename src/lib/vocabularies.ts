@@ -179,6 +179,28 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
     on_unknown: "Falls back to the searchable FAQ.",
   },
 
+  campaign_theme: {
+    field: "theme",
+    applies_to: "campaign",
+    values: [
+      {
+        value: "black_friday",
+        label: "Black Friday",
+        note:
+          "Black ground (#0b0b0f), gold accent (#f5c542), white text unless the campaign's colours say " +
+          "otherwise: the top bar with the countdown, the popup in black and gold with the offer large, a " +
+          "ribbon on the package cards, the hero's coloured words in the accent.",
+      },
+      {
+        value: "custom",
+        label: "Custom (colours only)",
+        note: "The same places, in the campaign's own colours and nothing else — for an occasion the site has no look for yet.",
+      },
+    ],
+    on_unknown: "The site falls back to the plain campaign look (colours only).",
+    note: "A new occasion is one value here, one in the panel's list and its look on the site.",
+  },
+
   child_pages_style: {
     field: "child_pages.style",
     applies_to: "page",

@@ -443,3 +443,12 @@ test("vocabulary: the v8 footer and its licence/accreditation groups are real va
   assert.equal(checkVocabulary("footer_section_group", "licence").ok, true);
   assert.equal(checkVocabulary("footer_section_group", "accreditation").ok, true);
 });
+
+test("registry: campaign texts are embedded in the row, keyed by language id", () => {
+  const surface = getSurface("campaign");
+  assert.equal(surface.source.path, "/admin/campaigns");
+  assert.equal(surface.source.key, "campaigns");
+  assert.deepEqual(surface.write, { mode: "embedded", put: "/admin/campaigns/{id}", key: "language_id" });
+  assert.ok(surface.fields.some((f) => f.name === "button_url" && f.kind === "url"));
+  assert.ok(surface.fields.some((f) => f.name === "popup_title"));
+});

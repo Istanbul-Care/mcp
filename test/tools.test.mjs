@@ -2204,3 +2204,60 @@ test("set_media_duration: PUTs the video's length", async () => {
   assert.equal(JSON.parse(r.content[0].text).duration_seconds, 260);
 });
 
+
+test("create_campaign: a Black Friday campaign with its colours, switches and texts", async () => {
+  const r = await call("create_campaign", {
+    project: PROJECT,
+    name: "Black Friday 2026",
+    theme: "black_friday",
+    is_active: true,
+    ends_at: "2026-11-30T23:59:00+03:00",
+    accent_color: "#f5c542",
+    show_popup: false,
+    translations: [{ language_id: 22, badge_text: "BLACK FRIDAY", discount_text: "-30%", button_url: "cta_url" }],
+  });
+  assert.ok(!isError(r));
+  const c = lastCall();
+  assert.equal(c.method, "POST");
+  assert.ok(c.url.endsWith("/admin/campaigns"), c.url);
+  const body = lastBody();
+  assert.equal(body.is_active, true);
+  assert.equal(body.theme, "black_friday");
+  assert.equal(body.show_popup, false);
+  assert.equal(body.translations[0].discount_text, "-30%");
+  assert.equal(JSON.parse(r.content[0].text).id, 123);
+});
+
+test("create_campaign / update_campaign: an unknown theme or a bad colour is refused before any request", async () => {
+  const bad = await call("create_campaign", { project: PROJECT, name: "X", theme: "blackfriday" });
+  assert.ok(isError(bad));
+  assert.match(bad.content[0].text, /campaign/);
+  assert.equal(calls.length, 0);
+  const schema = definitions.get("update_campaign").inputSchema;
+  assert.ok(!schema.accent_color.safeParse("gold").success);
+  assert.ok(schema.accent_color.safeParse("#ABCDEF").success);
+  assert.ok(schema.accent_color.safeParse(null).success);
+  const badUpdate = await call("update_campaign", { project: PROJECT, campaign_id: 3, theme: "xmas" });
+  assert.ok(isError(badUpdate));
+  assert.equal(calls.length, 0);
+  assert.deepEqual(VOCABULARIES.campaign_theme.values.map((v) => v.value), ["black_friday", "custom"]);
+});
+
+test("update_campaign: switches it on with a PUT of only what changes", async () => {
+  const r = await call("update_campaign", { project: PROJECT, campaign_id: 3, is_active: true });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.ok(lastCall().url.endsWith("/admin/campaigns/3"), lastCall().url);
+  assert.deepEqual(lastBody(), { is_active: true });
+});
+
+test("get_campaign / list_campaigns / delete_campaign", async () => {
+  await call("get_campaign", { project: PROJECT, campaign_id: 4 });
+  assert.equal(lastCall().method ?? "GET", "GET");
+  assert.ok(lastCall().url.includes("/admin/campaigns/4"), lastCall().url);
+  await call("list_campaigns", { project: PROJECT, limit: 50 });
+  assert.ok(lastCall().url.includes("/admin/campaigns"), lastCall().url);
+  await call("delete_campaign", { project: PROJECT, campaign_id: 4 });
+  assert.equal(lastCall().method, "DELETE");
+  assert.ok(lastCall().url.endsWith("/admin/campaigns/4"), lastCall().url);
+});

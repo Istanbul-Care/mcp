@@ -552,6 +552,28 @@ export const SURFACES: TranslatableSurface[] = [
     ],
   },
   {
+    // Seasonal campaigns (Black Friday, …): the texts live inside the row and
+    // the PUT upserts only the languages it is sent (the embedded write
+    // re-sends the others, which keeps them).
+    type: "campaign",
+    label: "Campaign (Black Friday, …)",
+    llm: null,
+    source: { path: "/admin/campaigns", key: "campaigns" },
+    write: { mode: "embedded", put: "/admin/campaigns/{id}", key: "language_id" },
+    titleField: "badge_text",
+    fields: [
+      t("badge_text", 60),
+      t("discount_text", 40),
+      t("bar_text", 200),
+      t("button_text", 60),
+      url("button_url"),
+      t("popup_eyebrow", 120),
+      t("popup_title", 200),
+      t("popup_description"),
+      t("popup_button_text", 60),
+    ],
+  },
+  {
     type: "before_after_ai_step",
     label: "Before/after-AI step",
     llm: null,
