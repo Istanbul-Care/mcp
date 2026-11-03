@@ -546,10 +546,10 @@ export function registerComponentTools(server: McpServer): void {
     show_side_card: z
       .boolean()
       .optional()
-      .describe("A card that slides in from the side of the screen (on phones a small tab on the edge); nothing on the page moves."),
+      .describe("Side card and tags: a card and price tags slide in from the sides of the screen (on phones a small tab); the card's X folds them all away, leaving one tag's corner. Nothing on the page moves."),
     show_countdown: z.boolean().optional().describe("The time left to ends_at, on the side card and in the popup."),
     show_popup: z.boolean().optional().describe("The popup in the campaign's look (picture, offer, the brand's popup form)."),
-    mark_packages: z.boolean().optional().describe("A ribbon with the offer on the price-table cards."),
+    mark_packages: z.boolean().optional().describe("A sticker with the offer on the corner of the price-table cards."),
     tint_hero: z.boolean().optional().describe("The hero's coloured words take the accent colour."),
     popup_image_id: z.number().int().nullable().optional().describe("An IMAGE of the media library for the popup; null removes it."),
     media_swaps: campaignSwaps.optional(),
@@ -579,7 +579,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Create a campaign",
       description:
         "Creates a seasonal campaign (Black Friday, …): a look laid over the whole site — a side card " +
-        "sliding in from the edge with the countdown, the popup in its colours, a ribbon on the package " +
+        "and price tags sliding in from the edges with the countdown, the popup in its colours, a sticker on the package " +
         "cards, the hero's accent, swapped pictures — that never changes the size of anything and goes " +
         "away when switched off. One is on at a time: is_active true switches the others off. " +
         "The site picks it up within a minute or two. Requires login.",

@@ -188,8 +188,8 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
         label: "Black Friday",
         note:
           "Black ground (#0b0b0f), gold accent (#f5c542), white text unless the campaign's colours say " +
-          "otherwise: a side card sliding in from the edge with the countdown, the popup in black and gold " +
-          "with the offer large, a ribbon on the package cards, the hero's coloured words in the accent — " +
+          "otherwise: a side card and price tags sliding in from the screen's edges, the popup in black and gold " +
+          "with the offer large on its picture, a sticker on the package cards, the hero's coloured words in the accent — " +
           "laid over the site, nothing changes size.",
       },
       {
