@@ -37,6 +37,8 @@ export interface CardTranslationDetail {
   button_text?: string | null;
   button_url?: string | null;
   button_icon?: string | null;
+  /** The small line over the title (v8 eyebrow); seo_text cards show it. */
+  eyebrow?: string | null;
 }
 
 /** GET /admin/cards/{id} — the whole card, every language. */
@@ -87,6 +89,7 @@ export function describeCard(card: CardDetail, language?: string): Record<string
   const text = wanted.map((row) => ({
     language: row.language?.code,
     language_id: row.language?.id,
+    ...(row.eyebrow ? { eyebrow: row.eyebrow } : {}),
     ...(row.title ? { title: row.title } : {}),
     ...(row.description ? { description: row.description } : {}),
     ...(row.button_text ? { button_text: row.button_text } : {}),
@@ -277,6 +280,10 @@ export function registerCardTools(server: McpServer): void {
         project: projectParam,
         language_id: z.number().int().describe("Language of this first translation."),
         title: z.string().optional(),
+        eyebrow: z
+          .string()
+          .optional()
+          .describe("The small line over the title (per language); 'seo_text' cards show it in capitals."),
         description: z.string().optional().describe("Card body — HTML allowed."),
         button_text: z.string().optional(),
         button_url: z.string().optional(),
@@ -290,7 +297,10 @@ export function registerCardTools(server: McpServer): void {
               "Its dark_mode picks the design: false = the title between two rules, the logos " +
               "with a button at each end that slides them on a click; true = the press strip in " +
               "the hero's colour for right after the hero (title as a small heading such as " +
-              "'As seen in', white logos sliding slowly by themselves).",
+              "'As seen in', white logos sliding slowly by themselves). 'seo_text' is the v8 " +
+              "SEO row on the brand's navy: picture (image_id) beside eyebrow, title and text; " +
+              "each <h3> in the description becomes a question that opens and closes; " +
+              "text_position left/right says where the text goes; two in a row read as one section.",
           ),
         image_id: z.number().int().optional(),
         media_ids: z.array(z.number().int()).optional(),
@@ -357,6 +367,7 @@ export function registerCardTools(server: McpServer): void {
             button_text: z.string().optional(),
             button_url: z.string().optional(),
             button_icon: z.string().optional(),
+            eyebrow: z.string().optional().describe("The small line over the title; '' clears it."),
           })
           .optional()
           .describe("Text for one language. Omit to touch only shared fields."),

@@ -18,7 +18,7 @@ import { basename, extname } from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { get, postForm, putForm } from "../api/client.js";
+import { get, put, postForm, putForm } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
 import { ok, fail, guard, projectParam } from "./helpers.js";
 
@@ -69,6 +69,9 @@ function summarise(item: MediaItem): Record<string, unknown> {
     thumbnail_url: item.thumbnail_url,
     filename: item.original_filename,
     ...(item.width && item.height ? { dimensions: `${item.width}x${item.height}` } : {}),
+    ...((item as { duration_seconds?: number | null }).duration_seconds
+      ? { duration_seconds: (item as { duration_seconds?: number | null }).duration_seconds }
+      : {}),
   };
 }
 
@@ -253,6 +256,31 @@ export function registerMediaTools(server: McpServer): void {
           form,
         );
         return ok({ project, added: true, ...summarise(response.data) });
+      }),
+  );
+
+  server.registerTool(
+    "set_media_duration",
+    {
+      title: "Set a video's length",
+      description:
+        "Sets the length of a video in the media library (an uploaded file or a YouTube / " +
+        "TikTok media). The site shows it on the video library's cards, a video page's line " +
+        "and its VideoObject data. YouTube does not hand the length over, so set it from the " +
+        "video's own page. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        media_id: z.number().int().describe("The video (from list_media or add_external_media)."),
+        duration_seconds: z.number().int().positive().max(86400).describe("e.g. 260 for 4:20."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ project, media_id, duration_seconds }) =>
+      guard(async () => {
+        const response = await put<Envelope<MediaItem>>(project, `/admin/media/${media_id}`, {
+          duration_seconds,
+        });
+        return ok({ project, updated: true, ...summarise(response.data) });
       }),
   );
 }

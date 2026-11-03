@@ -48,6 +48,11 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
       },
       { value: "whatsapp", label: "Consultation banner" },
       { value: "vertical_slider", label: "Vertical slider" },
+      {
+        value: "seo_text",
+        label: "SEO text (v8)",
+        note: "One row on the brand's navy: the card's picture beside the eyebrow (the per-language small line over the title), the title as the heading and the description as prose. Every <h3> in the description, with what follows it up to the next <h3>, becomes a question that opens and closes; the text before the first <h3> stays as it is. text_position: 'left' puts the text left (picture right), 'right' the text right (picture first). Two seo_text cards one after the other read as one section (the agency's two-row SEO block). Rendered by the site since 2026-11-03 (staging).",
+      },
       { value: "testimonial_gallery", label: "Testimonial gallery", note: "Media are consumed in pairs; an odd count leaves a gap." },
       { value: "word_cloud", label: "Why choose us", note: "Its description must be a JSON array of {title, description}." },
       { value: "media_slider", label: "Logo row", note: "A row of logos (press, partners, awards), media_ids being the logos. Two designs, picked by the card's dark_mode: false = design 1, the title between two rules and the logos in grey with a button at each end that slides the row on a click; true = design 2, the press strip in the hero's colour, made to sit right after the hero as its continuation: the title is a small uppercase heading (e.g. \"As seen in\"), the logos white and all one height, sliding slowly by themselves and stopping under the mouse. Rendered by the site since 2026-10-01 (design 2 since 2026-10-23)." },
@@ -96,7 +101,18 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
   footer_style: {
     field: "style",
     applies_to: "footer",
-    values: [{ value: "default" }, { value: "premium" }, { value: "editorial" }],
+    values: [
+      { value: "default" },
+      { value: "premium" },
+      { value: "editorial" },
+      {
+        value: "v8",
+        note:
+          "The brand's navy: logo and social icons, a link column per top_section, a contact column (the " +
+          "bottom_section call/mail items, WhatsApp through the lead form, the address with a map button's " +
+          "link), then the licence row (group 'licence' + group 'accreditation' logos) and the copyright line.",
+      },
+    ],
     on_unknown: "Falls back to default.",
   },
 
@@ -161,6 +177,36 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
       { value: "whatsapp_box_faq", label: "One list + WhatsApp box (v8)", note: "On the brand's navy: every question once, no categories or search, the first answer open and one open at a time, then a green WhatsApp box (\"Still have a question? Ask a doctor on WhatsApp · Chat now\") going through the lead form to the brand's WhatsApp." },
     ],
     on_unknown: "Falls back to the searchable FAQ.",
+  },
+
+  child_pages_style: {
+    field: "child_pages.style",
+    applies_to: "page",
+    values: [
+      { value: "", label: "Cards", unrendered: true, note: "The site does not draw the plain child-page cards." },
+      {
+        value: "videos",
+        label: "Video library (v8)",
+        note:
+          "The /videos/ page: the title and excerpt beside a featured video (the child whose banner video is " +
+          "the page's own banner_video_id, else the first doctor video), chips to the groups, the recovery " +
+          "timeline (video.month / video.day), doctor videos three to a row, short clips in a sliding shelf, " +
+          "patient stories. Only children with a banner video show; each is a layout_style 3 page.",
+      },
+    ],
+    on_unknown: "Not drawn.",
+  },
+
+  video_group: {
+    field: "video.group",
+    applies_to: "page (layout_style 3)",
+    values: [
+      { value: "recovery", label: "Recovery timeline", note: "Ordered by day then month; set video.month (and video.day for the first weeks)." },
+      { value: "doctor", label: "Doctor explains" },
+      { value: "clips", label: "Short clips", note: "A youtube.short / tiktok video stands 9:16 in the shelf." },
+      { value: "patients", label: "Patient stories" },
+    ],
+    on_unknown: "Refused by the API.",
   },
 
   header_item_type: {
@@ -270,8 +316,20 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
     values: [
       { value: "top_section", note: "Also the meaning of an empty value." },
       { value: "bottom_section", note: "Only bottom-section links run through the modal/CTA dispatcher." },
+      {
+        value: "licence",
+        note:
+          "v8 footer only: the section title (e.g. 'Licensed & accredited') and its text items as lines; its " +
+          "link items show in the copyright line (e.g. 'Verify on healthturkiye.gov.tr', opens in a new tab).",
+      },
+      {
+        value: "accreditation",
+        note:
+          "v8 footer only: one logo per section — its icon (icon_media_id), the title as the logo's name; " +
+          "an item's link makes the logo a link (new tab).",
+      },
     ],
-    on_unknown: "Treated as a top section.",
+    on_unknown: "Not shown (the site shows top_section/empty, bottom_section, and on the v8 footer licence/accreditation).",
   },
 
   link_icon: {

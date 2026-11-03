@@ -196,14 +196,25 @@ test("update_page: the services section takes a style and its categories", async
   assert.deepEqual(JSON.parse(r.content[0].text).changed, ["services"]);
 });
 
-test("update_page: the blog listing takes a style 1 to 4", async () => {
+test("update_page: the blog listing takes a style 1 to 5 (5 = the v8 list)", async () => {
   const blogs = { enabled: true, order: 4, grid_columns: 12, style: 3, query_parameters: "category_id=14" };
   const r = await call("update_page", { project: PROJECT, page_id: 223, blogs });
   assert.ok(!isError(r));
   assert.deepEqual(lastBody().blogs, blogs);
   const schema = definitions.get("update_page").inputSchema.blogs;
   assert.ok(schema.safeParse({ enabled: true, style: 4 }).success);
-  assert.ok(!schema.safeParse({ enabled: true, style: 5 }).success);
+  assert.ok(schema.safeParse({ enabled: true, style: 5 }).success);
+  assert.ok(!schema.safeParse({ enabled: true, style: 6 }).success);
+});
+
+test("update_page: a blog page's post design (single_blog_content style 2 = the v8 article)", async () => {
+  const single_blog_content = { enabled: true, order: 2, grid_columns: 12, style: 2 };
+  const r = await call("update_page", { project: PROJECT, page_id: 40, single_blog_content });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().single_blog_content, single_blog_content);
+  const schema = definitions.get("update_page").inputSchema.single_blog_content;
+  assert.ok(schema.safeParse({ enabled: true }).success);
+  assert.ok(!schema.safeParse({ enabled: true, style: 3 }).success);
 });
 
 const REVIEWS_V8 = {
@@ -261,10 +272,11 @@ test("get_page: shows the reviews block as stored, style and figures included", 
   assert.deepEqual(out.feature_blocks.reviews, REVIEWS_V8);
 });
 
-test("update_page: the services section accepts only style 1 or 2 and category ids", () => {
+test("update_page: the services section accepts only style 1, 2 or 3 and category ids", () => {
   const services = definitions.get("update_page").inputSchema.services;
   assert.ok(services.safeParse({ enabled: true, style: 2, category_ids: [4] }).success);
-  assert.ok(!services.safeParse({ enabled: true, style: 3 }).success);
+  assert.ok(services.safeParse({ enabled: true, style: 3, category_ids: [4, 5] }).success);
+  assert.ok(!services.safeParse({ enabled: true, style: 4 }).success);
   assert.ok(!services.safeParse({ enabled: true, category_ids: [0] }).success);
 });
 
@@ -2107,3 +2119,88 @@ test("get_page: shows the social media block as stored, style and see_all_url in
   const out = JSON.parse((await call("get_page", { project: PROJECT, page_id: 8 })).content[0].text);
   assert.deepEqual(out.feature_blocks.social_media, SOCIAL_V8);
 });
+
+test("create_card / update_card: the v8 seo_text card and its eyebrow", async () => {
+  const created = await call("create_card", {
+    project: PROJECT,
+    language_id: 1,
+    type: "seo_text",
+    eyebrow: "Natural results",
+    title: "Natural hairline design with DHI",
+    description: "<p>Every natural hairline is drawn for your face.</p>",
+    text_position: "left",
+  });
+  assert.ok(!isError(created));
+  assert.equal(lastBody().type, "seo_text");
+  assert.equal(lastBody().eyebrow, "Natural results");
+  const updated = await call("update_card", {
+    project: PROJECT,
+    card_id: 7,
+    translation_update: { language_id: 2, eyebrow: "Natürliche Ergebnisse" },
+  });
+  assert.ok(!isError(updated));
+  assert.equal(lastBody().translation_update.eyebrow, "Natürliche Ergebnisse");
+});
+
+test("update_page: the graft calculator takes its design (2 = the v8 wizard) and goes out camelCased", async () => {
+  const graft_calculator = { enabled: true, order: 1, grid_columns: 12, style: 2 };
+  const r = await call("update_page", { project: PROJECT, page_id: 108, graft_calculator });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().graftCalculator, graft_calculator);
+  assert.equal(lastBody().graft_calculator, undefined);
+  const schema = definitions.get("update_page").inputSchema.graft_calculator;
+  assert.ok(schema.safeParse({ enabled: true, style: 1 }).success);
+  assert.ok(!schema.safeParse({ enabled: true, style: 3 }).success);
+});
+
+test("create_page / update_page: a video page (layout 3) with its library group, and the video library", async () => {
+  for (const tool of ["create_page", "update_page"]) {
+    const schema = definitions.get(tool).inputSchema;
+    assert.ok(schema.layout_style.safeParse(3).success, tool);
+    assert.ok(!schema.layout_style.safeParse(4).success, tool);
+    assert.ok(schema.video.safeParse({ group: "recovery", month: 0, day: 10 }).success, tool);
+    assert.ok(schema.video.safeParse(null).success, tool);
+    assert.ok(!schema.video.safeParse({ group: "series" }).success, tool);
+    assert.ok(!schema.video.safeParse({ group: "recovery", month: 61 }).success, tool);
+  }
+  const childPages = definitions.get("update_page").inputSchema.child_pages;
+  assert.ok(childPages.safeParse({ show_child_pages: true, style: "videos" }).success);
+  assert.ok(!childPages.safeParse({ show_child_pages: true, style: "grid" }).success);
+
+  const r = await call("update_page", {
+    project: PROJECT,
+    page_id: 7,
+    layout_style: 3,
+    video: { group: "recovery", month: 12 },
+    child_pages: { show_child_pages: true, order: 1, style: "videos" },
+  });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().video, { group: "recovery", month: 12 });
+  assert.equal(lastBody().layout_style, 3);
+  assert.equal(lastBody().child_pages.style, "videos");
+  assert.deepEqual(VOCABULARIES.video_group.values.map((v) => v.value), ["recovery", "doctor", "clips", "patients"]);
+});
+
+test("get_page: shows a video page's library group", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/pages/9": {
+      status: "success",
+      data: { id: 9, translations: [], layout_style: 3, video: { group: "doctor" } },
+    },
+  });
+  const out = JSON.parse((await call("get_page", { project: PROJECT, page_id: 9 })).content[0].text);
+  assert.equal(out.layout_style, 3);
+  assert.deepEqual(out.video, { group: "doctor" });
+});
+
+test("set_media_duration: PUTs the video's length", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/media/41": { status: "success", data: { id: 41, media_type: "youtube.video", url: "a9a6ChWh4CQ", duration_seconds: 260 } },
+  });
+  const r = await call("set_media_duration", { project: PROJECT, media_id: 41, duration_seconds: 260 });
+  assert.ok(!isError(r));
+  assert.equal(lastCall().method, "PUT");
+  assert.deepEqual(lastBody(), { duration_seconds: 260 });
+  assert.equal(JSON.parse(r.content[0].text).duration_seconds, 260);
+});
+

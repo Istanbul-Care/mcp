@@ -179,13 +179,41 @@ const authorBoxParam = z
       "the page's sections like the other blocks; it shows nothing while the page has no author.",
   );
 const layoutStyleParam = z
-  .union([z.literal(1), z.literal(2)])
+  .union([z.literal(1), z.literal(2), z.literal(3)])
   .describe(
     "How the page lays out its blocks: 1 (default) one after another across the page; 2 the " +
       "article view — each block in a white box, one under the other, with the page's first " +
       "contact form (else the brand's) in a sidebar beside them on wide screens. A hero keeps the " +
-      "full width above; three titled blocks or more open with a contents list. Ignored on a page " +
-      "that carries a post or a service.",
+      "full width above; three titled blocks or more open with a contents list. 3 a VIDEO PAGE " +
+      "(v8): on the brand's navy the trail, the video group as the small heading (`video`), the " +
+      "title, a line with the length, date and medical reviewer (reviewer_id), banner_video_id as " +
+      "the player (YouTube loads only on play), the excerpt and the content under it (page_content " +
+      "must be enabled for the text to ship) — list items " +
+      "that start with a time ('0:42 Hairline at month 12') become the key-moment rows and an " +
+      "<h2>Transcript</h2> folds what follows — and beside it WhatsApp / free plan and the next " +
+      "videos of the parent page's video library. Ignored on a page that carries a post or a service.",
+  );
+const videoConfigParam = z
+  .object({
+    group: z
+      .enum(["recovery", "doctor", "clips", "patients"])
+      .describe(
+        "Where the video sits in its parent's video library: 'recovery' the timeline by day/month, " +
+          "'doctor' doctor explains, 'clips' short clips (Shorts stand upright), 'patients' patient stories.",
+      ),
+    month: z
+      .number()
+      .int()
+      .min(0)
+      .max(60)
+      .optional()
+      .describe("Recovery timeline: the month after the operation (0 with `day` for the first weeks)."),
+    day: z.number().int().min(1).max(31).optional().describe("Recovery timeline: the day, e.g. 10 (month 0)."),
+  })
+  .nullable()
+  .describe(
+    "A video page's (layout_style 3) place in the video library of its parent page (the parent " +
+      "needs child_pages {show_child_pages: true, style: 'videos'}). null clears it.",
   );
 const doctorsBlockParam = z
   .object({
@@ -205,8 +233,10 @@ const bannerVideoParam = z
   .positive()
   .nullable()
   .describe(
-    "Banner style 2: a VIDEO of the media library (uploaded, youtube.video, youtube.short or " +
-      "tiktok — see list_media / add_external_media); images are refused. null to clear.",
+    "Banner style 2, a video page's player (layout_style 3) or a video library's featured video: " +
+      "a VIDEO of the media library (uploaded, youtube.video, youtube.short or tiktok — see " +
+      "list_media / add_external_media; set its length with the media's duration_seconds); images " +
+      "are refused. null to clear.",
   );
 
 interface PageDetail extends PageListItem, PageSections {
@@ -217,6 +247,7 @@ interface PageDetail extends PageListItem, PageSections {
   author_id?: number | null;
   reviewer_id?: number | null;
   layout_style?: number | null;
+  video?: { group?: string | null; month?: number | null; day?: number | null } | null;
   doctors?: { enabled: boolean; order?: number; grid_columns?: number; doctor_ids: number[] } | null;
   footer_id?: number | null;
   featured_image_id?: number | null;
@@ -331,14 +362,36 @@ const featureFlagParam = z.object({
   grid_columns: z.number().int().min(1).max(12).optional(),
 });
 
-const servicesFlagParam = featureFlagParam
+const graftCalculatorFlagParam = featureFlagParam
   .extend({
     style: z
       .union([z.literal(1), z.literal(2)])
       .optional()
       .describe(
+        "1 (default): the scalp zones with age, sex, hair type and colour; the visitor fills in " +
+          "the form to see the estimate. 2: the v8 wizard on the brand's navy — the hair-loss " +
+          "picture (Norwood 1–7), the thin areas, the hair type, then the graft estimate beside a " +
+          "head map; the result offers 'WhatsApp my result' (the brand's WhatsApp, through the " +
+          "lead form) and 'Get it confirmed' (the contact form). When the page also has a price " +
+          "table (a package with style 2), the estimate suggests one of its packages: up to 2,500 " +
+          "grafts the first, up to 4,000 the recommended one, more the last.",
+      ),
+  })
+  .describe(
+    "The graft calculator block. The object you pass REPLACES the stored one, so send style " +
+      "each time — read get_page (feature_blocks.graftCalculator) first.",
+  );
+
+const servicesFlagParam = featureFlagParam
+  .extend({
+    style: z
+      .union([z.literal(1), z.literal(2), z.literal(3)])
+      .optional()
+      .describe(
         "1 (default): a row of tall photo cards with the categories as tabs above it. " +
-          "2: each category's services side by side under the category's name.",
+          "2: each category's services side by side under the category's name. " +
+          "3: the v8 'Our Treatments' — the categories as round tabs, each service a photo card " +
+          "(its featured image with the name on it, its excerpt as the short line, 'Learn more').",
       ),
     category_ids: z
       .array(z.number().int().positive())
@@ -356,12 +409,18 @@ const servicesFlagParam = featureFlagParam
 const blogsFlagParam = featureFlagParam
   .extend({
     style: z
-      .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
+      .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)])
       .optional()
       .describe(
         "1 (default): two-column cards, numbered pages. 2: editorial list, previous/next. " +
           "3: magazine (a lead post, then two, then three to a row), 'Load more posts'. " +
-          "4: small cards, four to a row, bare page numbers.",
+          "4: small cards, four to a row, bare page numbers. " +
+          "5: the v8 list — a search box, the post categories as chips (none when " +
+          "query_parameters fixes one category_id; that category's name is then its small " +
+          "title), the newest post large beside its excerpt, the rest three to a row, round " +
+          "page numbers. On the blog's own page (data_source_type 'blog_list', or the 'blog' " +
+          "slug) without the navy banner (banner_style 2) it opens the page itself: the " +
+          "breadcrumb, the page title as H1 and the excerpt on the brand's navy.",
       ),
     author_id: z.number().int().nullable().optional(),
     limit: z.number().int().min(1).optional(),
@@ -617,6 +676,7 @@ export function registerPageTools(server: McpServer): void {
           author_id: pageDetail.author_id ?? null,
           reviewer_id: pageDetail.reviewer_id ?? null,
           layout_style: pageDetail.layout_style ?? 1,
+          video: pageDetail.video ?? null,
           doctors: pageDetail.doctors ?? null,
           footer_id: pageDetail.footer_id,
           featured_image_id: pageDetail.featured_image_id,
@@ -721,6 +781,7 @@ export function registerPageTools(server: McpServer): void {
         reviewer_id: pageReviewerParam.optional(),
         author_box: authorBoxParam.optional(),
         layout_style: layoutStyleParam.optional(),
+        video: videoConfigParam.optional(),
         doctors: doctorsBlockParam.optional(),
         sticky_whatsapp: stickyWhatsAppParam.optional(),
       },
@@ -1039,6 +1100,7 @@ export function registerPageTools(server: McpServer): void {
         reviewer_id: pageReviewerParam.optional(),
         author_box: authorBoxParam.optional(),
         layout_style: layoutStyleParam.optional(),
+        video: videoConfigParam.optional(),
         doctors: doctorsBlockParam.optional(),
         header_id: z.number().int().optional(),
         header_style: headerStyleParam.optional(),
@@ -1079,26 +1141,52 @@ export function registerPageTools(server: McpServer): void {
         sticky_multi_form: stickyFormFlagParam.optional(),
         sticky_whatsapp: stickyWhatsAppParam.optional(),
         single_blog_content: featureFlagParam
+          .extend({
+            style: z
+              .union([z.literal(1), z.literal(2)])
+              .optional()
+              .describe(
+                "How the posts this page shows look. 1 (default): as it was — the picture " +
+                  "banner with the title. 2: the v8 article — on the brand's navy the " +
+                  "breadcrumb, category, dates, reading time, title, author and medical " +
+                  "reviewer; below, the post in a white box with its contents (the H2s) and " +
+                  "the page's first contact form (plus 'Or ask on WhatsApp') beside it.",
+              ),
+          })
           .optional()
           .describe(
             "Marks this as a single-blog page. Turning it on removes the standalone contact " +
-              "form, because this layout renders the form in its own sidebar.",
+              "form, because this layout renders the form in its own sidebar. The object you " +
+              "pass REPLACES the stored one, so send style each time.",
           ),
         single_service_content: featureFlagParam
           .optional()
           .describe("Marks this as a single-service page."),
         before_after_ai: featureFlagParam.optional(),
-        graft_calculator: featureFlagParam
+        graft_calculator: graftCalculatorFlagParam
           .optional()
-          .describe("Sent to the API as `graftCalculator` — the one camelCase key in this payload."),
+          .describe(
+            "Sent to the API as `graftCalculator` — the one camelCase key in this payload. " +
+              "style 2 = the v8 four-step wizard.",
+          ),
         child_pages: z
           .object({
             show_child_pages: z.boolean(),
             order: z.number().int().min(0).optional(),
             grid_columns: z.number().int().min(1).max(12).optional(),
+            style: z
+              .enum(["", "videos"])
+              .optional()
+              .describe(
+                "'' the child pages as cards (not drawn on the site yet); 'videos' the v8 video " +
+                  "library — the title beside a featured video (the child whose video is this page's " +
+                  "banner_video_id), chips to the groups, the recovery timeline by month, doctor " +
+                  "videos, short clips and patient stories. Each child is a layout_style 3 page with " +
+                  "banner_video_id and `video`.",
+              ),
           })
           .optional()
-          .describe("Uses show_child_pages, not enabled."),
+          .describe("Uses show_child_pages, not enabled. The object you pass replaces the stored one."),
         data_source_type: z
           .string()
           .nullable()

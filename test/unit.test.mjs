@@ -437,3 +437,9 @@ test("pruned: an explicit null still goes through", () => {
 test("vocabulary: the FAQ's v8 style is a real style", () => {
   assert.equal(checkVocabulary("faq_style", "whatsapp_box_faq").ok, true);
 });
+
+test("vocabulary: the v8 footer and its licence/accreditation groups are real values", () => {
+  assert.equal(checkVocabulary("footer_style", "v8").ok, true);
+  assert.equal(checkVocabulary("footer_section_group", "licence").ok, true);
+  assert.equal(checkVocabulary("footer_section_group", "accreditation").ok, true);
+});

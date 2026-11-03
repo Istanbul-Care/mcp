@@ -244,6 +244,7 @@ export const SURFACES: TranslatableSurface[] = [
     titleField: "title",
     fields: [
       t("title"),
+      t("eyebrow"),
       html("description"),
       t("button_text"),
       url("button_url"),
@@ -534,6 +535,7 @@ export const SURFACES: TranslatableSurface[] = [
     fields: [
       t("cta_text"),
       url("cta_url"),
+      t("popup_eyebrow"),
       t("popup_title"),
       t("popup_description"),
       t("popup_button_text"),

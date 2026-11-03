@@ -951,6 +951,22 @@ export function registerComponentTools(server: McpServer): void {
           .describe("Show a lead form inside the popup in place of its button (only while popup_enabled). After sending: " +
             "the popup's button link if it has one (a WhatsApp link opens straight away, no second form), " +
             "else a thank-you and the popup closes. Leave the button link empty for a form-only popup."),
+        popup_style: z
+          .number()
+          .int()
+          .min(1)
+          .max(2)
+          .optional()
+          .describe("The popup's design: 1 the brand panel with cards; 2 the v8 popup — popup_image with the eyebrow, " +
+            "title and description on it, beside the short lead form (name, phone, email) and a 'Chat on WhatsApp " +
+            "instead' button (through the lead form). Design 2 needs popup_show_form; without it design 1 shows. " +
+            "The eyebrow (popup_eyebrow) is per language, with the title."),
+        popup_image_id: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("The v8 popup's picture (a portrait photo, WebP); 0 removes it. Never a photo of someone who left the clinic."),
         is_active: z.boolean().optional(),
         language_id: z.number().int(),
         address: z.string(),
@@ -1020,6 +1036,22 @@ export function registerComponentTools(server: McpServer): void {
           .describe("Show a lead form inside the popup in place of its button (only while popup_enabled). After sending: " +
             "the popup's button link if it has one (a WhatsApp link opens straight away, no second form), " +
             "else a thank-you and the popup closes. Leave the button link empty for a form-only popup."),
+        popup_style: z
+          .number()
+          .int()
+          .min(1)
+          .max(2)
+          .optional()
+          .describe("The popup's design: 1 the brand panel with cards; 2 the v8 popup — popup_image with the eyebrow, " +
+            "title and description on it, beside the short lead form (name, phone, email) and a 'Chat on WhatsApp " +
+            "instead' button (through the lead form). Design 2 needs popup_show_form; without it design 1 shows. " +
+            "The eyebrow (popup_eyebrow) is per language, with the title."),
+        popup_image_id: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("The v8 popup's picture (a portrait photo, WebP); 0 removes it. Never a photo of someone who left the clinic."),
         is_active: z.boolean().optional(),
         embed_media: z
           .array(embedMediaItem)
