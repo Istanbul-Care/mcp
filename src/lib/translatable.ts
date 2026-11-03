@@ -564,7 +564,7 @@ export const SURFACES: TranslatableSurface[] = [
     fields: [
       t("badge_text", 60),
       t("discount_text", 40),
-      t("bar_text", 200),
+      t("side_text", 200),
       t("button_text", 60),
       url("button_url"),
       t("popup_eyebrow", 120),

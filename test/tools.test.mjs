@@ -2214,7 +2214,11 @@ test("create_campaign: a Black Friday campaign with its colours, switches and te
     ends_at: "2026-11-30T23:59:00+03:00",
     accent_color: "#f5c542",
     show_popup: false,
-    translations: [{ language_id: 22, badge_text: "BLACK FRIDAY", discount_text: "-30%", button_url: "cta_url" }],
+    show_side_card: true,
+    media_swaps: [{ from_media_id: 3712, to_media_id: 4001 }],
+    translations: [
+      { language_id: 22, badge_text: "BLACK FRIDAY", discount_text: "-30%", side_text: "Up to 30% off", button_url: "cta_url" },
+    ],
   });
   assert.ok(!isError(r));
   const c = lastCall();
@@ -2225,7 +2229,26 @@ test("create_campaign: a Black Friday campaign with its colours, switches and te
   assert.equal(body.theme, "black_friday");
   assert.equal(body.show_popup, false);
   assert.equal(body.translations[0].discount_text, "-30%");
+  assert.equal(body.translations[0].side_text, "Up to 30% off");
+  assert.equal(body.show_side_card, true);
+  assert.deepEqual(body.media_swaps, [{ from_media_id: 3712, to_media_id: 4001 }]);
   assert.equal(JSON.parse(r.content[0].text).id, 123);
+});
+
+test("update_campaign: picture swaps are checked before any request; [] clears them", async () => {
+  const schema = definitions.get("update_campaign").inputSchema;
+  assert.ok(!schema.media_swaps.safeParse([{ from_media_id: 5, to_media_id: 5 }]).success);
+  assert.ok(
+    !schema.media_swaps.safeParse([
+      { from_media_id: 5, to_media_id: 6 },
+      { from_media_id: 5, to_media_id: 7 },
+    ]).success,
+  );
+  assert.ok(!schema.media_swaps.safeParse([{ from_media_id: 5 }]).success);
+  assert.ok(!("show_bar" in schema));
+  const r = await call("update_campaign", { project: PROJECT, campaign_id: 3, media_swaps: [] });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody(), { media_swaps: [] });
 });
 
 test("create_campaign / update_campaign: an unknown theme or a bad colour is refused before any request", async () => {

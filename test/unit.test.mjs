@@ -451,4 +451,6 @@ test("registry: campaign texts are embedded in the row, keyed by language id", (
   assert.deepEqual(surface.write, { mode: "embedded", put: "/admin/campaigns/{id}", key: "language_id" });
   assert.ok(surface.fields.some((f) => f.name === "button_url" && f.kind === "url"));
   assert.ok(surface.fields.some((f) => f.name === "popup_title"));
+  assert.ok(surface.fields.some((f) => f.name === "side_text"));
+  assert.ok(!surface.fields.some((f) => f.name === "bar_text"));
 });

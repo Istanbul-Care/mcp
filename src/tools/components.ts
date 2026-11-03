@@ -485,14 +485,19 @@ export function registerComponentTools(server: McpServer): void {
         language_id: z.number().int(),
         badge_text: z.string().max(60).nullable().optional().describe("The occasion's name as shown: 'BLACK FRIDAY'."),
         discount_text: z.string().max(40).nullable().optional().describe("The offer in a few characters: '-30%'. Big in the popup, on the package ribbon."),
-        bar_text: z.string().max(200).nullable().optional().describe("The top bar's line: 'Up to 30% off every hair transplant package'."),
-        button_text: z.string().max(60).nullable().optional().describe("The bar's button: 'Claim the offer'."),
+        side_text: z
+          .string()
+          .max(200)
+          .nullable()
+          .optional()
+          .describe("The side card's line (the card that slides in from the edge): 'Up to 30% off every hair transplant package'."),
+        button_text: z.string().max(60).nullable().optional().describe("The side card's button: 'Claim the offer'."),
         button_url: z
           .string()
           .max(500)
           .nullable()
           .optional()
-          .describe("The bar button's link: 'cta_url' (WhatsApp through the lead form), 'contact-form' (the contact form) or a page link."),
+          .describe("The side card button's link: 'cta_url' (WhatsApp through the lead form), 'contact-form' (the contact form) or a page link."),
         popup_eyebrow: z.string().max(120).nullable().optional(),
         popup_title: z.string().max(200).nullable().optional(),
         popup_description: z.string().nullable().optional().describe("Plain text, a line or two."),
@@ -502,6 +507,28 @@ export function registerComponentTools(server: McpServer): void {
     .describe(
       "Per language. The languages given are written (every text of that language — send them all), the " +
         "others kept. The site shows the campaign ONLY in languages that have texts.",
+    );
+  const campaignSwaps = z
+    .array(
+      z.object({
+        from_media_id: z.number().int().positive().describe("The site's own picture (a media id)."),
+        to_media_id: z.number().int().positive().describe("The campaign picture shown in its place (an IMAGE)."),
+      }),
+    )
+    .superRefine((rows, ctx) => {
+      const seen = new Set<number>();
+      rows.forEach((row, i) => {
+        if (row.from_media_id === row.to_media_id)
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i], message: "a picture cannot replace itself" });
+        if (seen.has(row.from_media_id))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i], message: `media ${row.from_media_id} is replaced twice` });
+        seen.add(row.from_media_id);
+      });
+    })
+    .describe(
+      "Pictures swapped while the campaign is on: wherever the site shows from_media_id it shows " +
+        "to_media_id instead; the box keeps its size, so use pictures of a similar shape, not specific to " +
+        "a treatment or a doctor. Sent, the list REPLACES the old one ([] clears it); left out, kept.",
     );
   const campaignFields = {
     theme: z
@@ -516,12 +543,16 @@ export function registerComponentTools(server: McpServer): void {
     accent_color: hexColor.describe("'#rrggbb'; null = the theme's own (Black Friday: #f5c542)."),
     background_color: hexColor.describe("'#rrggbb'; null = the theme's own (Black Friday: #0b0b0f)."),
     text_color: hexColor.describe("'#rrggbb'; null = the theme's own (Black Friday: #ffffff)."),
-    show_bar: z.boolean().optional().describe("A slim bar across the top of every page: the offer and its button."),
-    show_countdown: z.boolean().optional().describe("The time left to ends_at, in the bar and the popup."),
+    show_side_card: z
+      .boolean()
+      .optional()
+      .describe("A card that slides in from the side of the screen (on phones a small tab on the edge); nothing on the page moves."),
+    show_countdown: z.boolean().optional().describe("The time left to ends_at, on the side card and in the popup."),
     show_popup: z.boolean().optional().describe("The popup in the campaign's look (picture, offer, the brand's popup form)."),
     mark_packages: z.boolean().optional().describe("A ribbon with the offer on the price-table cards."),
     tint_hero: z.boolean().optional().describe("The hero's coloured words take the accent colour."),
     popup_image_id: z.number().int().nullable().optional().describe("An IMAGE of the media library for the popup; null removes it."),
+    media_swaps: campaignSwaps.optional(),
   };
   const campaignVocabulary = (theme: unknown): Array<[string, unknown]> => [["campaign_theme", theme]];
 
@@ -529,7 +560,9 @@ export function registerComponentTools(server: McpServer): void {
     "get_campaign",
     {
       title: "Read one campaign",
-      description: "One seasonal campaign with its colours, switches and every language's texts. Requires login.",
+      description:
+        "One seasonal campaign with its colours, switches, picture swaps (media_swaps with both pictures) " +
+        "and every language's texts. Requires login.",
       inputSchema: { project: projectParam, campaign_id: z.number().int() },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
@@ -545,9 +578,10 @@ export function registerComponentTools(server: McpServer): void {
     {
       title: "Create a campaign",
       description:
-        "Creates a seasonal campaign (Black Friday, …): a site-wide look — top bar with countdown, the popup " +
-        "in its colours, a ribbon on the package cards, the hero's accent — that leaves the site's design as " +
-        "it is and goes away when switched off. One is on at a time: is_active true switches the others off. " +
+        "Creates a seasonal campaign (Black Friday, …): a look laid over the whole site — a side card " +
+        "sliding in from the edge with the countdown, the popup in its colours, a ribbon on the package " +
+        "cards, the hero's accent, swapped pictures — that never changes the size of anything and goes " +
+        "away when switched off. One is on at a time: is_active true switches the others off. " +
         "The site picks it up within a minute or two. Requires login.",
       inputSchema: {
         project: projectParam,
