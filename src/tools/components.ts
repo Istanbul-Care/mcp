@@ -866,4 +866,45 @@ export function registerComponentTools(server: McpServer): void {
         return ok({ project, setting_id, updated: true });
       }),
   );
+
+  server.registerTool(
+    "get_zapier_allow_list",
+    {
+      title: "Read the Zapier allow list",
+      description:
+        "Every lead is labelled first (real / test / spam); a real lead goes to Zapier (the CRM), a " +
+        "test or spam one only when its e-mail — or its @domain — is on this list (e.g. our own people " +
+        "testing the CRM). Others are only labelled. Per brand. Requires login.",
+      inputSchema: { project: projectParam },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ project }) =>
+      guard(async () => {
+        const response = await get<{ emails: string[] }>(project, "/admin/lead-quality/allow-list");
+        return ok({ project, emails: response.emails });
+      }),
+  );
+
+  server.registerTool(
+    "set_zapier_allow_list",
+    {
+      title: "Replace the Zapier allow list",
+      description:
+        "Replaces the brand's Zapier allow list: one entry per e-mail, or \"@domain.com\" for a whole " +
+        "domain. Their test or spam leads still go to Zapier; everyone else's only when real. [] empties " +
+        "it. Admins only. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        emails: z.array(z.string().min(3).max(254)).max(500),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, emails }) =>
+      guard(async () => {
+        const bad = emails.filter((e) => !/^(@[^@\s]+\.[a-z]{2,}|[^@\s]+@[^@\s]+\.[a-z]{2,})$/i.test(e.trim()));
+        if (bad.length) return fail(`Not an e-mail or @domain: ${bad.join(", ")}`);
+        const response = await put<{ emails: string[] }>(project, "/admin/lead-quality/allow-list", { emails });
+        return ok({ project, emails: response.emails });
+      }),
+  );
 }
