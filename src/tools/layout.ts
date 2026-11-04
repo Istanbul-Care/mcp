@@ -377,7 +377,8 @@ export function registerLayoutTools(server: McpServer): void {
     title: "Update a contact form's settings",
     description:
       "Changes a contact form's own settings (not its per-language texts — use the translation " +
-      "tools for those): where its leads are e-mailed, and whether it is the brand's default form.",
+      "tools for those): where its leads are e-mailed, whether it is the brand's default form, and " +
+      "its design (style).",
     params: {
       contact_form_id: z.number().int(),
       is_default: z
@@ -389,12 +390,25 @@ export function registerLayoutTools(server: McpServer): void {
             "forms, calculator leads). One per brand — setting it on one form clears the others.",
         ),
       forward_to_email: z.string().optional(),
+      style: z
+        .union([z.literal(1), z.literal(2)])
+        .optional()
+        .describe(
+          "The form's design: 1 (default) the standard form, every field at once; 2 the v8 two-step " +
+          "card on the brand navy — name, email and phone with the form's button and 'Or ask on " +
+          "WhatsApp' (both need those fields), then the same card asks the language and the " +
+          "treatment (the form's service options) with the privacy box, and its last button sends " +
+          "the lead; on the WhatsApp path it then opens the brand's WhatsApp (lead source " +
+          "whatsapp_redirect). Used by the sections, the heroes' card and the popup; the " +
+          "spotlight hero's strip keeps the standard layout.",
+        ),
     },
     method: "put",
     path: (a) => `/admin/contact-form/${a.contact_form_id}`,
     body: (a) => ({
       is_default: a.is_default,
       forward_to_email: a.forward_to_email,
+      style: a.style,
     }),
     echo: ["contact_form_id"],
   });

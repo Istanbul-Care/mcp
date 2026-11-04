@@ -52,6 +52,18 @@ export function registerFormTools(server: McpServer): void {
             "without naming a form (the form every WhatsApp link opens first, the popup and hero " +
             "forms, calculator leads). One per brand — setting it on one form clears the others.",
           ),
+        style: z
+          .union([z.literal(1), z.literal(2)])
+          .optional()
+          .describe(
+            "The form's design: 1 (default) the standard form, every field at once; 2 the v8 two-step " +
+            "card on the brand navy — name, email and phone with the form's button and 'Or ask on " +
+            "WhatsApp' (both need those fields), then the same card asks the language and the " +
+            "treatment (the form's service options) with the privacy box, and its last button sends " +
+            "the lead; on the WhatsApp path it then opens the brand's WhatsApp (lead source " +
+            "whatsapp_redirect). Used by the sections, the heroes' card and the popup; the " +
+            "spotlight hero's strip keeps the standard layout.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },

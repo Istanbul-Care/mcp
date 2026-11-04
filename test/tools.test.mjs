@@ -2345,3 +2345,15 @@ test("price compare: a country's text under the map, per language", async () => 
   assert.ok(!isError(r));
   assert.deepEqual(lastBody().translation_update, { language_id: 22, description: "" });
 });
+
+test("create_contact_form / update_contact_form: the form's design (style 1 or 2)", async () => {
+  for (const tool of ["create_contact_form", "update_contact_form"]) {
+    const schema = definitions.get(tool).inputSchema;
+    assert.ok(schema.style.safeParse(2).success, tool);
+    assert.ok(schema.style.safeParse(1).success, tool);
+    assert.ok(!schema.style.safeParse(3).success, tool);
+  }
+  const r = await call("update_contact_form", { project: PROJECT, contact_form_id: 3, style: 2 });
+  assert.ok(!isError(r));
+  assert.equal(lastBody().style, 2);
+});
