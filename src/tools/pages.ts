@@ -193,16 +193,26 @@ const layoutStyleParam = z
       "<h2>Transcript</h2> folds what follows — and beside it WhatsApp / free plan and the next " +
       "videos of the parent page's video library. Ignored on a page that carries a post or a service.",
   );
+const SECTION_KEY = /^(?:(?:heroes|cards|processes|before_afters|contact_forms|sliders|packages|price_compares|promotional_landings|multi_page_forms|google_map_sections):\d+|page_faq|page_content|blogs|services|social_media|reviews|graft_calculator|single_blog_content|single_service_content|before_after_ai|child_pages|doctors|author_box)$/;
+const SECTION_KEY_TEXT =
+  "A section is named the way the page lists it: a block attached by id with that id — 'heroes:6', " +
+  "'cards:1205', 'packages:21', 'processes:9' (the processes show as one block: name the first), " +
+  "'before_afters:11', 'price_compares:1', 'promotional_landings:2', 'contact_forms:3', 'sliders:4', " +
+  "'google_map_sections:1' — and a built-in block by its name: 'reviews', 'page_faq', 'services', " +
+  "'blogs', 'social_media', 'doctors', 'graft_calculator', 'author_box', 'child_pages', " +
+  "'page_content', 'single_blog_content', 'single_service_content', 'before_after_ai'.";
+const sectionKeyParam = z.string().regex(SECTION_KEY, "Unknown section: use e.g. 'heroes:6', 'cards:1205' or 'reviews'.");
 const sectionTonesParam = z
-  .enum(["alternate"])
+  .record(sectionKeyParam, z.enum(["dark", "light"]))
   .nullable()
   .describe(
-    "How the page colours its blocks (layout_style 1 only): null (default) each block in its own " +
-      "design's colours; 'alternate' the brand's navy and white in turn from the top — the first " +
-      "block (the hero) navy, the next white, and so on; blocks side by side share one colour. " +
-      "The v8 blocks (doctors, journey, price map, reviews, stories, SEO text, WhatsApp FAQ, press " +
-      "strip, treatments, before/after cases, packages, contact band, promotional landing) change " +
-      "their texts to suit; HTML cards keep their own colours, so give each the colour of its place.",
+    "Each section's colour, chosen by hand (layout_style 1): 'dark' the brand's navy, 'light' white; a " +
+      "section left out keeps its own design's colours. REPLACES the whole map ({} or null: every section " +
+      "as designed) — to change a few sections, use set_section_colours. " +
+      SECTION_KEY_TEXT +
+      " The v8 blocks (doctors, journey, price map, reviews, stories, SEO text, WhatsApp FAQ, press strip, " +
+      "treatments, before/after cases, packages, contact band, promotional landing) change their texts to " +
+      "suit; HTML cards keep the colours written in them.",
   );
 const videoConfigParam = z
   .object({
@@ -258,7 +268,7 @@ interface PageDetail extends PageListItem, PageSections {
   author_id?: number | null;
   reviewer_id?: number | null;
   layout_style?: number | null;
-  section_tones?: "alternate" | null;
+  section_tones?: Record<string, "dark" | "light"> | null;
   video?: { group?: string | null; month?: number | null; day?: number | null } | null;
   doctors?: { enabled: boolean; order?: number; grid_columns?: number; doctor_ids: number[] } | null;
   footer_id?: number | null;
@@ -1227,6 +1237,40 @@ export function registerPageTools(server: McpServer): void {
           updated: true,
           changed: Object.keys(payload).filter((k) => payload[k] !== undefined),
         });
+      }),
+  );
+
+  server.registerTool(
+    "set_section_colours",
+    {
+      title: "Set the colour of some of a page's sections",
+      description:
+        "Gives the named sections of a page the brand's navy ('dark') or white ('light'), or their own " +
+        "design back (null), and keeps every other section's colour as it is. " +
+        SECTION_KEY_TEXT +
+        " get_page shows the page's sections (their ids and order) and its current section_tones. " +
+        "Requires login.",
+      inputSchema: {
+        project: projectParam,
+        page_id: z.number().int(),
+        colours: z
+          .record(sectionKeyParam, z.enum(["dark", "light"]).nullable())
+          .describe("Section → 'dark' / 'light', or null for its own design: {'heroes:6': 'dark', 'reviews': 'light'}."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ project, page_id, colours }) =>
+      guard(async () => {
+        const page = await get<Envelope<{ section_tones?: Record<string, string> | null }>>(project, `/admin/pages/${page_id}`);
+        const current = page.data?.section_tones;
+        const tones: Record<string, string> =
+          current && typeof current === "object" && !Array.isArray(current) ? { ...current } : {};
+        for (const [key, tone] of Object.entries(colours)) {
+          if (tone) tones[key] = tone;
+          else delete tones[key];
+        }
+        await put(project, `/admin/pages/${page_id}`, { section_tones: tones });
+        return ok({ project, page_id, section_tones: tones });
       }),
   );
 }

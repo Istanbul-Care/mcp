@@ -2193,24 +2193,40 @@ test("get_page: shows a video page's library group", async () => {
   assert.deepEqual(out.video, { group: "doctor" });
 });
 
-test("create_page / update_page / get_page: section colours, as designed or navy and white in turn", async () => {
+test("create_page / update_page / get_page: each section's colour", async () => {
   for (const tool of ["create_page", "update_page"]) {
     const schema = definitions.get(tool).inputSchema;
-    assert.ok(schema.section_tones.safeParse("alternate").success, tool);
+    assert.ok(schema.section_tones.safeParse({ "heroes:6": "dark", reviews: "light" }).success, tool);
     assert.ok(schema.section_tones.safeParse(null).success, tool);
-    assert.ok(!schema.section_tones.safeParse("striped").success, tool);
+    assert.ok(!schema.section_tones.safeParse("alternate").success, tool);
+    assert.ok(!schema.section_tones.safeParse({ "heroes:6": "pink" }).success, tool);
+    assert.ok(!schema.section_tones.safeParse({ heroes: "dark" }).success, tool);
+    assert.ok(!schema.section_tones.safeParse({ "reviews:3": "dark" }).success, tool);
   }
-  const r = await call("update_page", { project: PROJECT, page_id: 7, section_tones: "alternate" });
+  const r = await call("update_page", { project: PROJECT, page_id: 7, section_tones: { "cards:1205": "dark" } });
   assert.ok(!isError(r));
-  assert.equal(lastBody().section_tones, "alternate");
-  await call("update_page", { project: PROJECT, page_id: 7, section_tones: null });
-  assert.equal(lastBody().section_tones, null);
+  assert.deepEqual(lastBody().section_tones, { "cards:1205": "dark" });
 
   globalThis.fetch = routedFetch({
-    "/admin/pages/38": { status: "success", data: { id: 38, translations: [], section_tones: "alternate" } },
+    "/admin/pages/38": { status: "success", data: { id: 38, translations: [], section_tones: { "heroes:6": "dark" } } },
   });
   const out = JSON.parse((await call("get_page", { project: PROJECT, page_id: 38 })).content[0].text);
-  assert.equal(out.section_tones, "alternate");
+  assert.deepEqual(out.section_tones, { "heroes:6": "dark" });
+});
+
+test("set_section_colours: changes only the named sections", async () => {
+  globalThis.fetch = routedFetch({
+    "/admin/pages/38": { status: "success", data: { id: 38, section_tones: { "heroes:6": "dark", reviews: "light" } } },
+  });
+  const r = await call("set_section_colours", {
+    project: PROJECT,
+    page_id: 38,
+    colours: { reviews: null, "cards:1232": "light" },
+  });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().section_tones, { "heroes:6": "dark", "cards:1232": "light" });
+  const bad = definitions.get("set_section_colours").inputSchema.colours.safeParse({ hero: "dark" });
+  assert.ok(!bad.success);
 });
 
 test("set_media_duration: PUTs the video's length", async () => {
