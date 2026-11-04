@@ -193,6 +193,17 @@ const layoutStyleParam = z
       "<h2>Transcript</h2> folds what follows — and beside it WhatsApp / free plan and the next " +
       "videos of the parent page's video library. Ignored on a page that carries a post or a service.",
   );
+const sectionTonesParam = z
+  .enum(["alternate"])
+  .nullable()
+  .describe(
+    "How the page colours its blocks (layout_style 1 only): null (default) each block in its own " +
+      "design's colours; 'alternate' the brand's navy and white in turn from the top — the first " +
+      "block (the hero) navy, the next white, and so on; blocks side by side share one colour. " +
+      "The v8 blocks (doctors, journey, price map, reviews, stories, SEO text, WhatsApp FAQ, press " +
+      "strip, treatments, before/after cases, packages, contact band, promotional landing) change " +
+      "their texts to suit; HTML cards keep their own colours, so give each the colour of its place.",
+  );
 const videoConfigParam = z
   .object({
     group: z
@@ -247,6 +258,7 @@ interface PageDetail extends PageListItem, PageSections {
   author_id?: number | null;
   reviewer_id?: number | null;
   layout_style?: number | null;
+  section_tones?: "alternate" | null;
   video?: { group?: string | null; month?: number | null; day?: number | null } | null;
   doctors?: { enabled: boolean; order?: number; grid_columns?: number; doctor_ids: number[] } | null;
   footer_id?: number | null;
@@ -676,6 +688,7 @@ export function registerPageTools(server: McpServer): void {
           author_id: pageDetail.author_id ?? null,
           reviewer_id: pageDetail.reviewer_id ?? null,
           layout_style: pageDetail.layout_style ?? 1,
+          section_tones: pageDetail.section_tones ?? null,
           video: pageDetail.video ?? null,
           doctors: pageDetail.doctors ?? null,
           footer_id: pageDetail.footer_id,
@@ -781,6 +794,7 @@ export function registerPageTools(server: McpServer): void {
         reviewer_id: pageReviewerParam.optional(),
         author_box: authorBoxParam.optional(),
         layout_style: layoutStyleParam.optional(),
+        section_tones: sectionTonesParam.optional(),
         video: videoConfigParam.optional(),
         doctors: doctorsBlockParam.optional(),
         sticky_whatsapp: stickyWhatsAppParam.optional(),
@@ -1100,6 +1114,7 @@ export function registerPageTools(server: McpServer): void {
         reviewer_id: pageReviewerParam.optional(),
         author_box: authorBoxParam.optional(),
         layout_style: layoutStyleParam.optional(),
+        section_tones: sectionTonesParam.optional(),
         video: videoConfigParam.optional(),
         doctors: doctorsBlockParam.optional(),
         header_id: z.number().int().optional(),

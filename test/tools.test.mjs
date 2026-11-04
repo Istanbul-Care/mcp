@@ -2193,6 +2193,26 @@ test("get_page: shows a video page's library group", async () => {
   assert.deepEqual(out.video, { group: "doctor" });
 });
 
+test("create_page / update_page / get_page: section colours, as designed or navy and white in turn", async () => {
+  for (const tool of ["create_page", "update_page"]) {
+    const schema = definitions.get(tool).inputSchema;
+    assert.ok(schema.section_tones.safeParse("alternate").success, tool);
+    assert.ok(schema.section_tones.safeParse(null).success, tool);
+    assert.ok(!schema.section_tones.safeParse("striped").success, tool);
+  }
+  const r = await call("update_page", { project: PROJECT, page_id: 7, section_tones: "alternate" });
+  assert.ok(!isError(r));
+  assert.equal(lastBody().section_tones, "alternate");
+  await call("update_page", { project: PROJECT, page_id: 7, section_tones: null });
+  assert.equal(lastBody().section_tones, null);
+
+  globalThis.fetch = routedFetch({
+    "/admin/pages/38": { status: "success", data: { id: 38, translations: [], section_tones: "alternate" } },
+  });
+  const out = JSON.parse((await call("get_page", { project: PROJECT, page_id: 38 })).content[0].text);
+  assert.equal(out.section_tones, "alternate");
+});
+
 test("set_media_duration: PUTs the video's length", async () => {
   globalThis.fetch = routedFetch({
     "/admin/media/41": { status: "success", data: { id: 41, media_type: "youtube.video", url: "a9a6ChWh4CQ", duration_seconds: 260 } },
