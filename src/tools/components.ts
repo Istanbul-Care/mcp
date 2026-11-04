@@ -1094,6 +1094,26 @@ export function registerComponentTools(server: McpServer): void {
   const embedVocabulary = (items: Array<{ media_type: string }> | undefined) =>
     (items ?? []).map((item): [string, unknown] => ["social_embed_type", item.media_type]);
 
+  const ratingBadges = z
+    .array(
+      z.object({
+        source: z.enum(["google", "provenexpert", "trustpilot", "whatclinic"]),
+        rating: z.number().min(0).max(5).describe("Out of 5, one decimal (4.8)."),
+        url: z
+          .string()
+          .url()
+          .nullable()
+          .optional()
+          .describe("The brand's reviews page there, a full https link (opens in a new tab)."),
+      }),
+    )
+    .max(6)
+    .describe(
+      "The brand's review scores as small pills above the team hero's headline (the source's logo, the score, " +
+        "five stars, the name), in this order; each source once. Use the scores the platforms really show. " +
+        "Replaces the whole list; [] removes the pills; leave it out to keep them.",
+    );
+
   server.registerTool(
     "create_global_setting",
     {
@@ -1137,6 +1157,7 @@ export function registerComponentTools(server: McpServer): void {
           .min(0)
           .optional()
           .describe("The v8 popup's picture (a portrait photo, WebP); 0 removes it. Never a photo of someone who left the clinic."),
+        rating_badges: ratingBadges.optional(),
         is_active: z.boolean().optional(),
         language_id: z.number().int(),
         address: z.string(),
@@ -1167,7 +1188,7 @@ export function registerComponentTools(server: McpServer): void {
       title: "Update the brand's global settings",
       description:
         "Edits the site-wide settings (robots/llms.txt, site URL, scripts, favicon, flags, the " +
-        "brand's embeds). Pass only what changes; the contact/social text is per-language — use " +
+        "brand's embeds, the review pills in the team hero). Pass only what changes; the contact/social text is per-language — use " +
         "the translate tools. embed_media is the exception to 'only what changes': it replaces " +
         "the whole list. Requires login.",
       inputSchema: {
@@ -1222,6 +1243,7 @@ export function registerComponentTools(server: McpServer): void {
           .min(0)
           .optional()
           .describe("The v8 popup's picture (a portrait photo, WebP); 0 removes it. Never a photo of someone who left the clinic."),
+        rating_badges: ratingBadges.optional(),
         is_active: z.boolean().optional(),
         embed_media: z
           .array(embedMediaItem)
