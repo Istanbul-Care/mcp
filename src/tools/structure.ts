@@ -694,6 +694,13 @@ export function registerStructureTools(server: McpServer): void {
       price_compare_id: z.number().int(),
       language_id: languageId,
       country_name: z.string(),
+      description: z
+      .string()
+      .optional()
+      .describe(
+        "World map design (style 2): the text under the map while this country is picked, in this " +
+          "language; empty = the comparison's own description.",
+      ),
       price_min: z.number().optional(),
       price_max: z.number().optional(),
       currency: z.string().optional().describe("ISO-4217, e.g. EUR."),
@@ -716,6 +723,7 @@ export function registerStructureTools(server: McpServer): void {
     body: (a) => ({
       language_id: a.language_id,
       country_name: a.country_name,
+      description: a.description,
       price_min: a.price_min,
       price_max: a.price_max,
       currency: a.currency,
@@ -733,8 +741,8 @@ export function registerStructureTools(server: McpServer): void {
     name: "update_price_compare_country",
     title: "Update a country row",
     description:
-      "Changes one country's prices, flag or highlight, and optionally its name in one " +
-      "language (pass language_id with country_name).",
+      "Changes one country's prices, flag or highlight, and optionally its name and its text " +
+      "under the world map in one language (pass language_id with country_name / description).",
     params: {
       country_id: z.number().int(),
       price_min: z.number().optional(),
@@ -755,6 +763,13 @@ export function registerStructureTools(server: McpServer): void {
       sort_order: sortOrder,
       language_id: z.number().int().optional(),
       country_name: z.string().optional(),
+      description: z
+      .string()
+      .optional()
+      .describe(
+        "World map design (style 2): the text under the map while this country is picked, in this " +
+          "language; empty = the comparison's own description.",
+      ),
     },
     method: "put",
     path: (a) => `/admin/price-compares/countries/${a.country_id}`,
@@ -767,7 +782,7 @@ export function registerStructureTools(server: McpServer): void {
       logo_id: a.logo_id,
       country_code: a.country_code?.toUpperCase(),
       sort_order: a.sort_order,
-      translation_update: translationUpdate(a, ["country_name"]),
+      translation_update: translationUpdate(a, ["country_name", "description"]),
     }),
     checks: (a) => ensureFormats([checkCurrency(a.currency)]),
     echo: ["country_id"],

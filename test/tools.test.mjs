@@ -2298,3 +2298,14 @@ test("price compare: the world map design and each row's place on the map", asyn
   assert.ok(code.safeParse("").success);
   assert.ok(!code.safeParse("USA").success);
 });
+
+test("price compare: a country's text under the map, per language", async () => {
+  let r = await call("create_price_compare_country", {
+    project: PROJECT, price_compare_id: 1, language_id: 22, country_name: "Canada", description: "Why Canadians fly to Istanbul.",
+  });
+  assert.ok(!isError(r));
+  assert.equal(lastBody().description, "Why Canadians fly to Istanbul.");
+  r = await call("update_price_compare_country", { project: PROJECT, country_id: 1, language_id: 22, description: "" });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().translation_update, { language_id: 22, description: "" });
+});

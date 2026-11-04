@@ -411,7 +411,8 @@ export const SURFACES: TranslatableSurface[] = [
     source: { path: "/admin/price-compares", key: "price_compares", child: "countries" },
     write: endpoint("/admin/price-compares/countries"),
     titleField: "country_name",
-    fields: [t("country_name")],
+    // description: the text under the world map while this country is picked.
+    fields: [t("country_name"), t("description")],
   },
   {
     type: "promotional_landing",
