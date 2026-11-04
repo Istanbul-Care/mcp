@@ -655,12 +655,19 @@ export function registerStructureTools(server: McpServer): void {
     name: "update_price_compare",
     title: "Update a price-comparison section",
     description:
-      "Changes the block's position, background, or its headings in ONE language " +
-      "(pass language_id with any text field).",
+      "Changes the block's position, background, design (style: 1 the bars, 2 the world map), or its " +
+      "headings in ONE language (pass language_id with any text field).",
     params: {
       price_compare_id: z.number().int(),
       sort_order: sortOrder,
       background_image_id: z.number().int().optional(),
+      style: z
+        .number()
+        .int()
+        .min(1)
+        .max(2)
+        .optional()
+        .describe("1 the bars; 2 the world map (each row then needs its country_code)."),
       language_id: z.number().int().optional().describe("Required when changing any text."),
       main_title: z.string().optional(),
       bottom_title: z.string().optional(),
@@ -671,6 +678,7 @@ export function registerStructureTools(server: McpServer): void {
     body: (a) => ({
       sort_order: a.sort_order,
       background_image_id: a.background_image_id,
+      style: a.style,
       translation_update: translationUpdate(a, ["main_title", "bottom_title", "description"]),
     }),
     echo: ["price_compare_id"],
@@ -692,6 +700,15 @@ export function registerStructureTools(server: McpServer): void {
       percentage: z.number().int().min(0).max(100).optional(),
       is_highlighted: z.boolean().optional().describe("Marks this row as the clinic's own."),
       logo_id: z.number().int().optional().describe("Flag image."),
+      country_code: z
+      .string()
+      .regex(/^([A-Za-z]{2})?$/)
+      .optional()
+      .describe(
+        "Where the row is on the world map (style 2): ISO 3166 alpha-2 (US, GB, TR) or EU for the " +
+          "European Union (lights every member state); \"\" takes it off the map. Leave the clinic's own " +
+          "(highlighted) row off the map.",
+      ),
       sort_order: sortOrder,
     },
     method: "post",
@@ -705,6 +722,7 @@ export function registerStructureTools(server: McpServer): void {
       percentage: a.percentage,
       is_highlighted: a.is_highlighted,
       logo_id: a.logo_id,
+      country_code: a.country_code?.toUpperCase(),
       sort_order: a.sort_order,
     }),
     checks: (a) => ensureFormats([checkCurrency(a.currency)]),
@@ -725,6 +743,15 @@ export function registerStructureTools(server: McpServer): void {
       percentage: z.number().int().min(0).max(100).optional(),
       is_highlighted: z.boolean().optional(),
       logo_id: z.number().int().optional(),
+      country_code: z
+      .string()
+      .regex(/^([A-Za-z]{2})?$/)
+      .optional()
+      .describe(
+        "Where the row is on the world map (style 2): ISO 3166 alpha-2 (US, GB, TR) or EU for the " +
+          "European Union (lights every member state); \"\" takes it off the map. Leave the clinic's own " +
+          "(highlighted) row off the map.",
+      ),
       sort_order: sortOrder,
       language_id: z.number().int().optional(),
       country_name: z.string().optional(),
@@ -738,6 +765,7 @@ export function registerStructureTools(server: McpServer): void {
       percentage: a.percentage,
       is_highlighted: a.is_highlighted,
       logo_id: a.logo_id,
+      country_code: a.country_code?.toUpperCase(),
       sort_order: a.sort_order,
       translation_update: translationUpdate(a, ["country_name"]),
     }),

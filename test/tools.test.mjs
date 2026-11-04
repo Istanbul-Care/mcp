@@ -2284,3 +2284,17 @@ test("get_campaign / list_campaigns / delete_campaign", async () => {
   assert.equal(lastCall().method, "DELETE");
   assert.ok(lastCall().url.endsWith("/admin/campaigns/4"), lastCall().url);
 });
+
+test("price compare: the world map design and each row's place on the map", async () => {
+  let r = await call("update_price_compare", { project: PROJECT, price_compare_id: 1, style: 2 });
+  assert.ok(!isError(r));
+  assert.equal(lastBody().style, 2);
+  assert.ok(!definitions.get("update_price_compare").inputSchema.style.safeParse(3).success);
+  r = await call("update_price_compare_country", { project: PROJECT, country_id: 4, country_code: "gb" });
+  assert.ok(!isError(r));
+  assert.equal(lastBody().country_code, "GB");
+  const code = definitions.get("create_price_compare_country").inputSchema.country_code;
+  assert.ok(code.safeParse("EU").success);
+  assert.ok(code.safeParse("").success);
+  assert.ok(!code.safeParse("USA").success);
+});

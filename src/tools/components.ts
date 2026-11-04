@@ -879,7 +879,8 @@ export function registerComponentTools(server: McpServer): void {
       title: "Create a price-comparison section",
       description:
         "Creates a price-comparison block with its first-language titles. Add per-country rows " +
-        "afterwards. Requires login.",
+        "afterwards. style 2 is the v8 world map: each row needs its country_code, the clinic's own " +
+        "row is the highlighted one. Requires login.",
       inputSchema: {
         project: projectParam,
         main_title: z.string(),
@@ -888,6 +889,13 @@ export function registerComponentTools(server: McpServer): void {
         language_id: z.number().int().optional(),
         sort_order: z.number().int().optional(),
         background_image_id: z.number().int().optional(),
+        style: z
+          .number()
+          .int()
+          .min(1)
+          .max(2)
+          .optional()
+          .describe("1 the bars (default); 2 the world map — the countries on a map, the picked one compared with Türkiye and the clinic."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
