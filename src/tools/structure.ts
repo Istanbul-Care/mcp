@@ -49,6 +49,9 @@ import {
   caseCategoryIdsParam,
   caseMonthsAfterParam,
   caseTagFields,
+  casePatientNameParam,
+  caseCountryParam,
+  caseLossAreaParam,
   caseViewsParam,
 } from "./before-after-fields.js";
 
@@ -911,6 +914,12 @@ export function registerStructureTools(server: McpServer): void {
     params: {
       before_after_id: z.number().int(),
       style: z.string().optional().describe(BEFORE_AFTER_STYLE_TEXT),
+      results_page_id: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("style_6: the page with all the results ('All results' links to it, in each language); 0 clears."),
       sort_order: sortOrder,
       language_id: z.number().int().optional(),
       title: z.string().optional(),
@@ -920,6 +929,7 @@ export function registerStructureTools(server: McpServer): void {
     path: (a) => `/admin/before-afters/${a.before_after_id}`,
     body: (a) => ({
       style: a.style,
+      results_page_id: a.results_page_id,
       sort_order: a.sort_order,
       translation_update: translationUpdate(a, ["title", "description"]),
     }),
@@ -949,6 +959,9 @@ export function registerStructureTools(server: McpServer): void {
       months_after: caseMonthsAfterParam.optional(),
       category_ids: caseCategoryIdsParam.optional(),
       views: caseViewsParam.optional(),
+      patient_name: casePatientNameParam.optional(),
+      country_code: caseCountryParam.optional(),
+      loss_area: caseLossAreaParam.optional(),
     },
     method: "post",
     path: (a) => `/admin/before-afters/${a.before_after_id}/gallery-items`,
@@ -986,6 +999,9 @@ export function registerStructureTools(server: McpServer): void {
       months_after: caseMonthsAfterParam.optional(),
       category_ids: caseCategoryIdsParam.optional(),
       views: caseViewsParam.optional(),
+      patient_name: casePatientNameParam.optional(),
+      country_code: caseCountryParam.optional(),
+      loss_area: caseLossAreaParam.optional(),
     },
     method: "put",
     path: (a) => `/admin/before-afters/gallery-items/${a.gallery_item_id}`,

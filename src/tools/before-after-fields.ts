@@ -55,6 +55,28 @@ export const caseViewsParam = z
       "shows them in the brand's angle order, the own pair among them.",
   );
 
+/** The results finder's (style_6) patient fields. */
+export const casePatientNameParam = z
+  .string()
+  .max(60)
+  .nullable()
+  .describe(
+    "The patient's FIRST name as the card shows it (style_6) — only with their written consent; " +
+      "never invent one. null / '' clears.",
+  );
+export const caseCountryParam = z
+  .string()
+  .regex(/^([A-Za-z]{2})?$/, "Two letters: GB, DE, IT…")
+  .nullable()
+  .describe("The patient's country, ISO 3166 alpha-2 (GB, DE…): the card's flag and name. null / '' clears.");
+export const caseLossAreaParam = z
+  .enum(["hairline", "front", "advanced"])
+  .nullable()
+  .describe(
+    "Where the hair loss was before (style_6's first filter): 'hairline' = hairline and temples, " +
+      "'front' = front and mid-scalp, 'advanced' = large area / crown. null clears.",
+  );
+
 /** Every case field, as the create endpoints take them. */
 export const caseFields = {
   before_media_id: z.number().int().optional().describe("The before photo (a media id)."),
@@ -68,6 +90,9 @@ export const caseFields = {
   months_after: caseMonthsAfterParam.optional(),
   category_ids: caseCategoryIdsParam.optional(),
   views: caseViewsParam.optional(),
+  patient_name: casePatientNameParam.optional(),
+  country_code: caseCountryParam.optional(),
+  loss_area: caseLossAreaParam.optional(),
 };
 
 /** The case fields that only style_5 shows, picked off a tool's arguments. */
@@ -77,11 +102,17 @@ export function caseTagFields(args: Record<string, unknown>): Record<string, unk
     months_after: args.months_after,
     category_ids: args.category_ids,
     views: args.views,
+    patient_name: args.patient_name,
+    country_code: args.country_code,
+    loss_area: args.loss_area,
   };
 }
 
 export const BEFORE_AFTER_STYLE_TEXT =
-  "style_1 … style_5 (get_vocabularies before_after_style). style_5 = cases by angle: each " +
+  "style_1 … style_6 (get_vocabularies before_after_style). style_5 = cases by angle: each " +
   "case's photos from several angles with a category filter, using each case's angle_id, " +
   "views, category_ids and months_after — create the angles and categories first " +
-  "(create_before_after_angle / create_before_after_category).";
+  "(create_before_after_angle / create_before_after_category). style_6 = the results finder: " +
+  "hair-loss area and technique filters, a matching-patients count with 'All results' " +
+  "(results_page_id) and patient cards (front pair, first name, country, grafts, technique · " +
+  "months) — set each case's patient_name, country_code and loss_area.";

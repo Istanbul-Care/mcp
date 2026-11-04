@@ -164,6 +164,7 @@ export const VOCABULARIES: Record<string, Vocabulary> = {
       { value: "style_3", label: "Clinical results grid" },
       { value: "style_4", label: "Before/after hero", note: "All style_4 records on a page merge into one filterable gallery, using only the first one's order." },
       { value: "style_5", label: "Cases by angle", note: "Each case's photos from several angles with a category filter. Uses each case's angle_id (its own pair's angle), views (its other angles), category_ids and months_after, not the sex/technique/graft/age chips. The angles and categories are lists the brand keeps, a name per language: create them first (create_before_after_angle / create_before_after_category), then set them on the cases (create_gallery_item / update_gallery_item)." },
+      { value: "style_6", label: "Results finder", note: "The agency's 'Patient results': the visitor picks where the hair loss is (hairline / front / advanced, plus 'Not sure' which offers a doctor on WhatsApp) and the technique, and sees how many patients match and their cards — the front before/after pair (the case's first view), first name and country, grafts, technique and months, the area. Uses each case's patient_name (first name, written consent only), country_code, loss_area, technique, graft, months_after and views; the section's results_page_id for 'All results'. Six cards first, then 'See all'. Filters offer only what the cases have." },
     ],
     on_unknown: "The record is not rendered in any of the five layouts.",
   },
