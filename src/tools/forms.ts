@@ -17,6 +17,32 @@ interface Created {
   id: number;
 }
 
+const fieldMode = z.enum(["required", "optional", "hidden"]);
+
+/** How a contact form asks for each field (WEB #43): shared by create and update. */
+export const contactFormFieldSettings = z
+  .object({
+    full_name: fieldMode.optional(),
+    email: fieldMode.optional(),
+    phone_number: fieldMode.optional(),
+    language: fieldMode.optional(),
+    service: fieldMode.optional(),
+  })
+  .strict()
+  .refine((s) => !(s.phone_number === "hidden" && s.email === "hidden"), {
+    message: "phone_number and email cannot both be hidden",
+  })
+  .nullable()
+  .optional()
+  .describe(
+    "How the form asks for each field: \"required\" (with a star), \"optional\" (may be left " +
+    "empty) or \"hidden\" (not on the form), for full_name, email, phone_number, language and " +
+    "service (the treatment). A field left out stays required (as before). With language and " +
+    "service both hidden the v8 form (style 2) is ONE step: phone, name, email and its button " +
+    "send the lead (the language is the page's). Phone and email cannot both be hidden. On " +
+    "update the map replaces the old one; null clears it (every field required again).",
+  );
+
 export function registerFormTools(server: McpServer): void {
   server.registerTool(
     "create_contact_form",
@@ -64,6 +90,7 @@ export function registerFormTools(server: McpServer): void {
             "whatsapp_redirect). Used by the sections, the heroes' card and the popup; the " +
             "spotlight hero's strip keeps the standard layout.",
           ),
+        field_settings: contactFormFieldSettings,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },

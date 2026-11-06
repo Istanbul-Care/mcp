@@ -2357,3 +2357,22 @@ test("create_contact_form / update_contact_form: the form's design (style 1 or 2
   assert.ok(!isError(r));
   assert.equal(lastBody().style, 2);
 });
+
+test("create_contact_form / update_contact_form: field_settings per field (WEB #43)", async () => {
+  for (const tool of ["create_contact_form", "update_contact_form"]) {
+    const schema = definitions.get(tool).inputSchema;
+    assert.ok(schema.field_settings.safeParse({ language: "hidden", service: "hidden" }).success, tool);
+    assert.ok(schema.field_settings.safeParse(null).success, tool);
+    assert.ok(!schema.field_settings.safeParse({ email: "hidden", phone_number: "hidden" }).success, tool);
+    assert.ok(!schema.field_settings.safeParse({ language: "maybe" }).success, tool);
+    assert.ok(!schema.field_settings.safeParse({ address: "hidden" }).success, tool);
+  }
+  const r = await call("update_contact_form", {
+    project: PROJECT,
+    contact_form_id: 3,
+    field_settings: { language: "hidden", service: "hidden" },
+  });
+  assert.ok(!isError(r));
+  assert.deepEqual(lastBody().field_settings, { language: "hidden", service: "hidden" });
+});
+

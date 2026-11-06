@@ -20,6 +20,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { get } from "../api/client.js";
 import type { Envelope } from "../api/types.js";
 import { ok, guard, projectParam, registerWrite, ensureVocabulary } from "./helpers.js";
+import { contactFormFieldSettings } from "./forms.js";
 
 const languageId = z
   .number()
@@ -377,8 +378,8 @@ export function registerLayoutTools(server: McpServer): void {
     title: "Update a contact form's settings",
     description:
       "Changes a contact form's own settings (not its per-language texts — use the translation " +
-      "tools for those): where its leads are e-mailed, whether it is the brand's default form, and " +
-      "its design (style).",
+      "tools for those): where its leads are e-mailed, whether it is the brand's default form, " +
+      "its design (style) and which fields it asks for (field_settings).",
     params: {
       contact_form_id: z.number().int(),
       is_default: z
@@ -402,6 +403,7 @@ export function registerLayoutTools(server: McpServer): void {
           "whatsapp_redirect). Used by the sections, the heroes' card and the popup; the " +
           "spotlight hero's strip keeps the standard layout.",
         ),
+      field_settings: contactFormFieldSettings,
     },
     method: "put",
     path: (a) => `/admin/contact-form/${a.contact_form_id}`,
@@ -409,6 +411,7 @@ export function registerLayoutTools(server: McpServer): void {
       is_default: a.is_default,
       forward_to_email: a.forward_to_email,
       style: a.style,
+      field_settings: a.field_settings,
     }),
     echo: ["contact_form_id"],
   });
