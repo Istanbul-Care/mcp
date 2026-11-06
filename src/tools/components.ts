@@ -1105,12 +1105,17 @@ export function registerComponentTools(server: McpServer): void {
           .nullable()
           .optional()
           .describe("The brand's reviews page there, a full https link (opens in a new tab)."),
+        count: z.number().int().min(0).nullable().optional().describe("How many reviews (1179): the footer card's '1,179 reviews'."),
+        hero: z
+          .boolean()
+          .optional()
+          .describe("Also a pill in the team hero (default true); the v8 footer's licence row shows every badge as a card."),
       }),
     )
     .max(6)
     .describe(
       "The brand's review scores as small pills above the team hero's headline (the source's logo, the score, " +
-        "five stars, the name), in this order; each source once. Use the scores the platforms really show. " +
+        "five stars, the name) and as cards in the v8 footer's licence row (with the review count), in this order; each source once. Use the scores the platforms really show. " +
         "Replaces the whole list; [] removes the pills; leave it out to keep them.",
     );
 
