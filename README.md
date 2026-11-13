@@ -132,6 +132,8 @@ agent is doing the writing.
 | `deactivate_*` / `restore_*` / `delete_*` (post, page, service) | ✓ | Reversible takedown, undo, and permanent removal |
 | `update_service` / `publish_service` / `unpublish_service` | ✓ | What posts already had, for services |
 | `bulk_update_posts` / `bulk_update_pages` / `bulk_update_services` | ✓ | Status and robots flags across a list of ids |
+| `relink_redirected_links` / `get_relink_job` | ✓ | Every stored link to an address that has a redirect → the address the redirect ends at (posts, pages, cards, FAQs, menus, footers, buttons, canonicals); dry run by default, as a job; reports the redirects left out (to a home page, another language, another site). A redirect saved with `create_redirect` / `update_redirect` relinks its own old address by itself |
+| `bulk_search_content` / `bulk_replace_content` / `get_bulk_job` / `get_bulk_job_registry` | ✓ | Find or replace plain text across all of a brand's content (dry run by default; slugs never rewritten; the pages re-bake after a real replace) |
 
 `✓` needs login.
 

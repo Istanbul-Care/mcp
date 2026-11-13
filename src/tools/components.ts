@@ -279,7 +279,10 @@ export function registerComponentTools(server: McpServer): void {
         "sees them on the site, with the language prefix the site uses (none for the " +
         "default language): /de/old-page/ → /de/new-page/. The backend stores the source " +
         "as /v1/<lang>/pages/<path>, the form the site looks up; the reply shows it. " +
-        "Files (.pdf, .webp) and home pages can't be redirected. Requires login.",
+        "Files (.pdf, .webp) and home pages can't be redirected. Saving it also rewrites the " +
+        "stored links to the old address (posts, pages, cards, menus...) to the new one, as a " +
+        "job, when both are pages of the same language; relink_redirected_links does that for " +
+        "redirects saved earlier. Requires login.",
       inputSchema: {
         project: projectParam,
         source_url: z

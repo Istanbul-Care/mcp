@@ -24,6 +24,7 @@ import { registerStructureTools } from "../dist/tools/structure.js";
 import { registerLayoutTools } from "../dist/tools/layout.js";
 import { registerTaxonomyTools } from "../dist/tools/taxonomy.js";
 import { registerDiscoveryTools } from "../dist/tools/discovery.js";
+import { registerBulkContentTools } from "../dist/tools/bulk-content.js";
 import { VOCABULARIES } from "../dist/lib/vocabularies.js";
 
 const PROJECT = "staging";
@@ -76,6 +77,7 @@ before(() => {
     registerLayoutTools,
     registerTaxonomyTools,
     registerDiscoveryTools,
+    registerBulkContentTools,
   ]) {
     register(server);
   }
@@ -2376,3 +2378,92 @@ test("create_contact_form / update_contact_form: field_settings per field (WEB #
   assert.deepEqual(lastBody().field_settings, { language: "hidden", service: "hidden" });
 });
 
+
+test("relink_redirected_links: POST /admin/redirects/relink, a dry run by default", async () => {
+  // NB: the stub server bypasses zod, so pass the defaults explicitly.
+  globalThis.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), method: opts.method, body: opts.body });
+    return new Response(JSON.stringify({ status: "accepted", job_id: 41 }), {
+      status: 202,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  const r = await call("relink_redirected_links", {
+    project: PROJECT,
+    dry_run: true,
+    include_home_targets: false,
+    wait_seconds: 0,
+  });
+  assert.ok(!isError(r));
+  assert.equal(calls[0].method, "POST");
+  assert.ok(calls[0].url.endsWith("/admin/redirects/relink"), calls[0].url);
+  assert.deepEqual(JSON.parse(calls[0].body), { dry_run: true, include_home_targets: false });
+  assert.match(r.content[0].text, /"job_id": 41/);
+});
+
+test("get_relink_job: GET /admin/redirects/relink/{id} and the top old addresses", async () => {
+  globalThis.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), method: opts.method });
+    return new Response(
+      JSON.stringify({
+        status: "success",
+        data: {
+          id: 41,
+          status: "completed",
+          summary: { dry_run: true, rewritten_occurrences: 3, by_url: { "/es/old": 3 }, new_url: { "/es/old": "/es/new" } },
+        },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  };
+  const r = await call("get_relink_job", { project: PROJECT, job_id: 41 });
+  assert.ok(lastCall().url.endsWith("/admin/redirects/relink/41"));
+  const out = JSON.parse(r.content[0].text);
+  assert.deepEqual(out.top_old_addresses, [{ old: "/es/old", new: "/es/new", links: 3 }]);
+  assert.equal(out.links_rewritten, 3);
+});
+
+test("bulk_replace_content: POST /admin/content/bulk-replace with rules, a dry run by default", async () => {
+  globalThis.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), method: opts.method, body: opts.body });
+    return new Response(JSON.stringify({ status: "accepted", job_id: 7 }), {
+      status: 202,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  await call("bulk_replace_content", {
+    project: PROJECT,
+    rules: [{ find: 'href="/es/a/"', replace: 'href="/es/b/"' }],
+    entities: ["post", "card"],
+    dry_run: true,
+    max_matches: 100,
+    wait_seconds: 0,
+  });
+  assert.ok(calls[0].url.endsWith("/admin/content/bulk-replace"));
+  const body = JSON.parse(calls[0].body);
+  assert.equal(body.dry_run, true);
+  assert.deepEqual(body.entities, ["post", "card"]);
+  assert.deepEqual(body.rules, [{ find: 'href="/es/a/"', replace: 'href="/es/b/"', case_sensitive: false }]);
+});
+
+test("bulk_search_content: POST /admin/content/bulk-search with one rule per term", async () => {
+  globalThis.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), method: opts.method, body: opts.body });
+    return new Response(JSON.stringify({ status: "accepted", job_id: 8 }), {
+      status: 202,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  await call("bulk_search_content", {
+    project: PROJECT,
+    terms: ["/es/a/", "Old Name"],
+    case_sensitive: false,
+    max_matches: 50,
+    wait_seconds: 0,
+  });
+  assert.ok(calls[0].url.endsWith("/admin/content/bulk-search"));
+  assert.deepEqual(JSON.parse(calls[0].body).rules, [
+    { find: "/es/a/", case_sensitive: false },
+    { find: "Old Name", case_sensitive: false },
+  ]);
+});
