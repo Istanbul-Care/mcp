@@ -68,13 +68,17 @@ export const caseCountryParam = z
   .string()
   .regex(/^([A-Za-z]{2})?$/, "Two letters: GB, DE, IT…")
   .nullable()
-  .describe("The patient's country, ISO 3166 alpha-2 (GB, DE…): the card's flag and name. null / '' clears.");
+  .describe(
+    "The patient's country, ISO 3166 alpha-2 (GB, DE…). Kept with the case; the style_6 slider " +
+      "(since 2026-11-17) no longer shows it. null / '' clears.",
+  );
 export const caseLossAreaParam = z
   .enum(["hairline", "front", "advanced"])
   .nullable()
   .describe(
-    "Where the hair loss was before (style_6's first filter): 'hairline' = hairline and temples, " +
-      "'front' = front and mid-scalp, 'advanced' = large area / crown. null clears.",
+    "Where the hair loss was before: 'hairline' = hairline and temples, 'front' = front and " +
+      "mid-scalp, 'advanced' = large area / crown. Kept with the case; style_6 filters by " +
+      "technique now, not by this. null clears.",
   );
 
 /** Every case field, as the create endpoints take them. */
@@ -82,8 +86,16 @@ export const caseFields = {
   before_media_id: z.number().int().optional().describe("The before photo (a media id)."),
   after_media_id: z.number().int().optional().describe("The after photo (a media id)."),
   sex: z.string().max(255).optional(),
-  technique: z.string().max(255).optional(),
-  graft: z.string().max(255).optional(),
+  technique: z
+    .string()
+    .max(255)
+    .optional()
+    .describe("The method, e.g. 'FUE', 'DHI', 'Sapphire FUE' — style_6's filter buttons read FUE / DHI from it."),
+  graft: z
+    .string()
+    .max(255)
+    .optional()
+    .describe("Grafts, digits only ('4000'): style_6 shows '12 months · 4,000 grafts' with months_after."),
   age: z.string().max(255).optional(),
   sort_order: z.number().int().min(0).optional().describe("Lower sorts first."),
   angle_id: caseAngleParam.optional(),
@@ -112,7 +124,12 @@ export const BEFORE_AFTER_STYLE_TEXT =
   "style_1 … style_6 (get_vocabularies before_after_style). style_5 = cases by angle: each " +
   "case's photos from several angles with a category filter, using each case's angle_id, " +
   "views, category_ids and months_after — create the angles and categories first " +
-  "(create_before_after_angle / create_before_after_category). style_6 = the results finder: " +
-  "hair-loss area and technique filters, a matching-patients count with 'All results' " +
-  "(results_page_id) and patient cards (front pair, first name, country, grafts, technique · " +
-  "months) — set each case's patient_name, country_code and loss_area.";
+  "(create_before_after_angle / create_before_after_category). style_6 = the results finder, " +
+  "the v8 slider (2026-11-17): 'All techniques' + FUE / DHI buttons (from each case's " +
+  "technique; a method shows only when some case has it), the matching-patients count with " +
+  "'All results' (results_page_id), and one sliding row of patient cards — the before and after " +
+  "from one angle with a button per angle (the case's own pair at angle_id plus its views; " +
+  "create the angles first: Right, Left, Top…), the FIRST name (patient_name) and " +
+  "'12 months · 4,000 grafts' (months_after, graft). To change a patient's photos: upload_media, " +
+  "then update_gallery_item with before_media_id / after_media_id (the own pair) and views " +
+  "(the other angles). Real patients only, names with their written consent.";
