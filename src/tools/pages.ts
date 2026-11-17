@@ -142,12 +142,16 @@ const headerStyleParam = z
   );
 
 const bannerStyleParam = z
-  .union([z.literal(1), z.literal(2)])
+  .union([z.literal(1), z.literal(2), z.literal(3)])
   .describe(
     "The banner at the top of the page (breadcrumb_enabled): 1 (default) the featured image " +
       "under a dark veil with the title and breadcrumb; 2 the brand's navy, no picture — the " +
       "breadcrumb, the title and the page's excerpt on the left and banner_video_id on the right " +
-      "(under them on phones). Without a video the text fills the banner.",
+      "(under them on phones). Without a video the text fills the banner. 3 the brand's navy " +
+      "holding the breadcrumb and then the page's FIRST CARD, laid out by that card's own HTML " +
+      "(the v8 Contact Us page: eyebrow, <h1> headline, text, photo). Give that card an <h1> — " +
+      "without one the page title and excerpt show above it. The card is not repeated below; in " +
+      "layout_style 2 the boxes start over the banner's bottom edge. No card: the plain navy banner.",
   );
 const pageAuthorParam = z
   .number()
