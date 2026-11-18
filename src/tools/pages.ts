@@ -33,7 +33,19 @@ interface PageTranslation {
   robots_index?: boolean | null;
   robots_follow?: boolean | null;
   child_pages_heading?: string | null;
+  /** The page's own section headings in this language (WEB #145). */
+  section_titles?: Record<string, string> | null;
 }
+
+/** The sections whose heading a page can write itself, per language. */
+const SECTION_TITLE_KEYS = [
+  "doctors",
+  "reviews",
+  "faq",
+  "graft_calculator",
+  "stories",
+  "stories_line",
+] as const;
 
 /**
  * The translation columns a content write has to carry along. The PUT takes the
@@ -725,6 +737,7 @@ export function registerPageTools(server: McpServer): void {
             meta_title: t.meta_title,
             meta_description: t.meta_description,
             content_chars: (t.content ?? "").length,
+            section_titles: t.section_titles ?? null,
           })),
         });
       }),
@@ -832,6 +845,81 @@ export function registerPageTools(server: McpServer): void {
             "Add other languages with the translation tools (auto_translate for pages).",
             "Attach body sections (heroes, cards, …) with update_page.",
           ],
+        });
+      }),
+  );
+
+  server.registerTool(
+    "set_section_titles",
+    {
+      title: "Set a page's own section headings",
+      description:
+        "Writes, for ONE language of a page, the headings of the sections the site otherwise " +
+        "titles with its fixed text: doctors (the doctors section), reviews, faq, " +
+        "graft_calculator (the classic graft calculator; the v8 wizard keeps its step titles), " +
+        "stories (the patient stories heading) and stories_line (the line under it). " +
+        "Only the keys you pass change; an empty string clears that heading so the site's own " +
+        "comes back; keys you leave out keep what they have. A word wrapped in *stars* is " +
+        "drawn in the accent colour where the section does so (reviews, stories). Use it when " +
+        "an SEO report asks for a page-specific H2 (e.g. the keyword in the FAQ heading). " +
+        "The rest of the translation is read first and re-sent unchanged. The language row " +
+        "must already exist. get_page shows the current ones per language. Requires login.",
+      inputSchema: {
+        project: projectParam,
+        page_id: z.number().int(),
+        language_code: z.string().min(2).describe("Which language's headings to write, e.g. 'de'."),
+        titles: z
+          .object({
+            doctors: z.string().max(255).optional(),
+            reviews: z.string().max(255).optional(),
+            faq: z.string().max(255).optional(),
+            graft_calculator: z.string().max(255).optional(),
+            stories: z.string().max(255).optional(),
+            stories_line: z.string().max(500).optional(),
+          })
+          .strict()
+          .describe("The headings to set; '' clears one."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ project, page_id, language_code, titles }) =>
+      guard(async () => {
+        const code = language_code.toLowerCase();
+        const languageId = (await resolveLanguageIds(project, [code])).get(code);
+        if (languageId === undefined) return fail(`'${code}' is not an active language.`);
+        if (!Object.keys(titles).length) return fail("Pass at least one heading in `titles`.");
+
+        const response = await get<Envelope<PageDetail>>(project, `/admin/pages/${page_id}`, {
+          language_id: languageId,
+        });
+        const existing = (response.data.translations ?? []).find(
+          (t) => t.language?.code?.toLowerCase() === code,
+        );
+        if (!existing) {
+          return fail(
+            `Page ${page_id} has no '${code}' translation yet. Create it first ` +
+              "(auto_translate, or save_translations with type 'page').",
+          );
+        }
+
+        const body: Record<string, unknown> = { section_titles: titles };
+        for (const field of TRANSLATION_FIELDS) {
+          const value = existing[field];
+          if (value !== undefined && value !== null) body[field] = value;
+        }
+        const saved = await put<Envelope<PageTranslation> | PageTranslation>(
+          project,
+          `/admin/pages/${page_id}/translations/${languageId}`,
+          body,
+        );
+        const row = ((saved as Envelope<PageTranslation>).data ?? saved) as PageTranslation;
+        const now = row?.section_titles ?? null;
+        return ok({
+          project,
+          page_id,
+          language: code,
+          section_titles: now,
+          site_default_for: SECTION_TITLE_KEYS.filter((key) => !now?.[key]),
         });
       }),
   );
