@@ -1129,7 +1129,7 @@ export function registerStructureTools(server: McpServer): void {
   registerWrite(server, {
     name: "create_offer",
     title: "Add a line to a package tier",
-    description: "Adds one bullet — what the tier includes — with its first-language wording.",
+    description: "Adds one bullet — what the tier includes — with its first-language wording. Write \"[name](/path/)\" in the text to link a page, e.g. a doctor's profile (shown with a small person icon); use that language's path.",
     params: {
       section_id: z.number().int(),
       language_id: languageId,
@@ -1153,7 +1153,7 @@ export function registerStructureTools(server: McpServer): void {
   registerWrite(server, {
     name: "update_offer_translation",
     title: "Update a package line's text",
-    description: "Rewrites one language of an offer bullet.",
+    description: "Rewrites one language of an offer bullet. Write \"[name](/path/)\" in the text to link a page, e.g. a doctor's profile (shown with a small person icon); use that language's path.",
     params: {
       offer_id: z.number().int(),
       language_id: languageId,
